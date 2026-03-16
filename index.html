@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Double-Crystal Monochromator (DCM) Simulation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        /* Custom styling for range inputs */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 0 4px rgba(0,0,0,0.5);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #4b5563;
+            border-radius: 2px;
+        }
+        input[type=range]:focus { outline: none; }
+        
+        .num-input {
+            width: 75px;
+            background-color: #030712;
+            border: 1px solid #374151;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 0.75rem;
+            text-align: right;
+            color: #d1d5db;
+            font-family: monospace;
+        }
+        .num-input:focus {
+            border-color: #3b82f6;
+            outline: none;
+        }
+        .num-input:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            border-color: #1f2937;
+        }
+        
+        canvas { display: block; }
+    </style>
+</head>
+<body class="flex h-screen bg-gray-950 text-gray-200 overflow-hidden">
+
+    <!-- Left GUI Panel -->
+    <div class="w-80 bg-gray-900 border-r border-gray-800 flex flex-col shadow-2xl z-10 shrink-0">
+        <div class="p-5 border-b border-gray-800 bg-gray-900">
+            <h1 class="text-xl font-bold text-blue-400 tracking-wide">DCM Simulator</h1>
+            <p class="text-xs text-gray-500 mt-1">X-ray Optics & Geometry</p>
+        </div>
+
+        <div class="p-5 flex-1 overflow-y-auto space-y-6" id="controls-container">
+            
+            <!-- Bragg Optics & Energy -->
+            <div class="bg-blue-900/10 p-4 rounded-lg border border-blue-500/30">
+                <h2 class="text-sm font-semibold text-blue-300 uppercase tracking-wider mb-4 flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z"></path></svg>
+                    Bragg OPTICS
+                </h2>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-xs text-blue-200">Crystal Pair </label>
+                        <select id="sel-crystal-type" class="bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-blue-300 focus:outline-none focus:border-blue-500">
+                            <option value="Si111">Si (111)</option>
+                            <option value="Si220">Si (220)</option>
+                            <option value="Si311">Si (311)</option>
+                            <option value="Ge111">Ge (111)</option>
+                            <option value="custom">Custom...</option>
+                        </select>
+                    </div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-xs text-blue-200">d-spacing (Å)</label>
+                        <input type="number" id="num-d-spacing" class="num-input text-blue-400" min="0.1" max="20" step="0.0001" value="3.1356" disabled>
+                    </div>
+                    <div class="pt-2 border-t border-blue-500/20">
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs font-semibold text-yellow-400">Energy (keV)</label>
+                            <input type="number" id="num-energy" class="num-input font-bold text-yellow-400" min="1" max="150" step="0.01">
+                        </div>
+                        <div class="flex justify-between items-center mt-2">
+                            <label class="text-xs text-gray-400">Wavelength (Å)</label>
+                            <span id="lbl-wavelength" class="text-xs font-mono text-gray-300">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Ray Controls -->
+            <div class="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
+                <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4 flex items-center">
+                    <svg class="w-4 h-4 mr-2 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z"></path></svg>
+                    Ray Source
+                </h2>
+                <div class="space-y-3">
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs text-gray-400">Beam Height (mm)</label>
+                            <input type="number" id="num-beam-size" class="num-input text-cyan-400" min="0" max="10" step="0.1">
+                        </div>
+                        <input type="range" id="sld-beam-size" min="0" max="10" step="0.1">
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs text-gray-400">Beam Divergence (µrad)</label>
+                            <input type="number" id="num-divergence" class="num-input text-cyan-400" min="0" max="500" step="1">
+                        </div>
+                        <input type="range" id="sld-divergence" min="0" max="500" step="1">
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs text-gray-400">Number of Rays</label>
+                            <input type="number" id="num-num-rays" class="num-input text-cyan-400" min="1" max="51" step="1">
+                        </div>
+                        <input type="range" id="sld-num-rays" min="1" max="51" step="1">
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs text-gray-400">Start X (mm)</label>
+                            <input type="number" id="num-start-x" class="num-input" min="-2000" max="0" step="10">
+                        </div>
+                        <input type="range" id="sld-start-x" min="-2000" max="0" step="10">
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs text-gray-400">Start Y (mm)</label>
+                            <input type="number" id="num-start-y" class="num-input" min="-100" max="100" step="1">
+                        </div>
+                        <input type="range" id="sld-start-y" min="-100" max="100" step="1">
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs text-gray-400">Beam Angle (mrad)</label>
+                            <input type="number" id="num-ray-angle" class="num-input text-cyan-400" min="-35" max="35" step="0.1">
+                        </div>
+                        <input type="range" id="sld-ray-angle" min="-35" max="35" step="0.1">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Goniometer Angle -->
+            <div class="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
+                <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4 flex items-center">
+                    <svg class="w-4 h-4 mr-2 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    Goniometer Angle
+                </h2>
+                <div>
+                    <div class="flex justify-between gap-2 mb-4">
+                        <div class="flex-1 text-center bg-gray-950 border border-gray-800 rounded p-2 shadow-inner">
+                            <div class="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Goniometer</div>
+                            <div id="lcd-rect-angle" class="font-mono text-xl font-bold text-green-400">00.000°</div>
+                        </div>
+                        <div class="flex-1 text-center bg-gray-950 border border-gray-800 rounded p-2 shadow-inner">
+                            <div class="text-[10px] text-gray-500 uppercase tracking-wider mb-1">True Bragg</div>
+                            <div id="lbl-true-bragg" class="font-mono text-xl font-bold text-blue-400">00.000°</div>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-xs text-gray-400">Angle θ (°)</label>
+                        <input type="number" id="num-rect-angle" class="num-input text-green-400" min="0" max="89" step="0.001">
+                    </div>
+                    <input type="range" id="sld-rect-angle" min="0" max="89" step="0.001" class="mb-4">
+                    
+                    <div class="pt-2 border-t border-gray-700/50">
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs text-gray-400 flex items-center">
+                                Ray Angle Offset (mrad)
+                                <button id="btn-auto-ray-offset" class="ml-2 text-[10px] px-2 py-0.5 rounded border border-blue-500 bg-blue-900/50 text-blue-300 transition-colors focus:outline-none">Auto: ON</button>
+                            </label>
+                            <input type="number" id="num-ray-angle-offset" class="num-input text-cyan-400 opacity-50 cursor-not-allowed" min="-35" max="35" step="0.1" disabled>
+                        </div>
+                        <input type="range" id="sld-ray-angle-offset" min="-35" max="35" step="0.1" class="opacity-50 cursor-not-allowed" disabled>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Crystal Dimensions -->
+            <div class="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
+                <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4 flex items-center">
+                    <svg class="w-4 h-4 mr-2 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                    Crystal Sizes
+                </h2>
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs text-gray-400">C1 Length (mm)</label>
+                            <input type="number" id="num-c1-len" class="num-input text-pink-400" min="5" max="100" step="1">
+                        </div>
+                        <input type="range" id="sld-c1-len" min="5" max="100" step="1">
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs text-gray-400">C2 Length (mm)</label>
+                            <input type="number" id="num-c2-len" class="num-input text-pink-400" min="10" max="250" step="1">
+                        </div>
+                        <input type="range" id="sld-c2-len" min="10" max="250" step="1">
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs text-gray-400">Thickness (mm)</label>
+                            <input type="number" id="num-thickness" class="num-input text-pink-400" min="1" max="50" step="1">
+                        </div>
+                        <input type="range" id="sld-thickness" min="1" max="50" step="1">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Crystal 1 Stage -->
+            <div class="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
+                <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4 flex items-center">
+                    <svg class="w-4 h-4 mr-2 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                    Crystal 1 Stage
+                </h2>
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs text-gray-400">Home X (mm)</label>
+                            <input type="number" id="num-c1-x" class="num-input text-orange-400" min="-100" max="100" step="0.1">
+                        </div>
+                        <input type="range" id="sld-c1-x" min="-100" max="100" step="0.1">
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs text-gray-400">Home Y (mm)</label>
+                            <input type="number" id="num-c1-y" class="num-input text-orange-400" min="-100" max="100" step="0.1">
+                        </div>
+                        <input type="range" id="sld-c1-y" min="-100" max="100" step="0.1">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Crystal 2 Stage -->
+            <div class="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
+                <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4 flex items-center">
+                    <svg class="w-4 h-4 mr-2 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                    Crystal 2 Stage
+                </h2>
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs text-gray-400">Horizontal Shift X (mm)</label>
+                            <input type="number" id="num-c2-x" class="num-input text-purple-400" min="-50" max="200" step="0.1">
+                        </div>
+                        <input type="range" id="sld-c2-x" min="-50" max="200" step="0.1">
+                    </div>
+                    <div class="pt-2 border-t border-gray-700/50">
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs text-gray-400 flex items-center">
+                                Vertical Gap Y (mm)
+                                <button id="btn-auto-gap" class="ml-2 text-[10px] px-2 py-0.5 rounded border border-gray-600 bg-gray-800 text-gray-400 hover:text-white transition-colors focus:outline-none">Auto: OFF</button>
+                            </label>
+                            <input type="number" id="num-c2-y" class="num-input text-purple-400" min="-50" max="100" step="0.1">
+                        </div>
+                        <input type="range" id="sld-c2-y" min="-50" max="100" step="0.1">
+                    </div>
+
+                    <!-- Fixed Offset H for Auto Calculation -->
+                    <div id="container-offset-h" class="hidden bg-indigo-900/20 p-2 rounded border border-indigo-500/30">
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs text-indigo-300">Fixed Offset <i class="font-serif">h</i> (mm)</label>
+                            <input type="number" id="num-offset-h" class="num-input text-indigo-400" min="0" max="100" step="0.1">
+                        </div>
+                        <input type="range" id="sld-offset-h" min="0" max="100" step="0.1">
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs text-gray-400">Pitch Detune (µrad)</label>
+                            <input type="number" id="num-c2-pitch" class="num-input text-purple-400" min="-500" max="500" step="1">
+                        </div>
+                        <input type="range" id="sld-c2-pitch" min="-500" max="500" step="1">
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Main Rendering Canvas Area -->
+    <div class="flex-1 relative bg-black" id="canvas-container">
+        <canvas id="simCanvas" class="absolute inset-0 w-full h-full"></canvas>
+        
+        <!-- Toggle Grid Button -->
+        <div class="absolute top-6 left-6 z-10">
+            <button id="btn-toggle-grid" class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded border border-gray-600 shadow-sm text-xs font-semibold tracking-wide transition-colors">
+                Toggle Grid
+            </button>
+        </div>
+
+        <!-- Screen Readout overlay -->
+        <div class="absolute top-6 right-6 bg-gray-900/90 border border-gray-700 shadow-lg rounded-lg p-4 backdrop-blur-sm w-72 flex flex-col gap-4 z-10">
+            <!-- Screen 1 (Input) -->
+            <div class="border-b border-gray-700/50 pb-3">
+                <div class="flex justify-between items-center mb-1">
+                    <div class="text-xs text-blue-400 uppercase tracking-wider font-semibold">Screen 1 (upstream) y</div>
+                    <input type="number" id="num-det1-x" class="num-input text-blue-400 w-16" min="-1000" max="0" step="1">
+                </div>
+                <input type="range" id="sld-det1-x" min="-1000" max="0" step="1" class="mb-2">
+                <div id="detector1-label" class="font-mono text-blue-400 font-bold text-sm">
+                    No Hit
+                </div>
+            </div>
+            
+            <!-- Screen 2 (Output) -->
+            <div class="border-b border-gray-700/50 pb-3">
+                <div class="flex justify-between items-center mb-1">
+                    <div class="text-xs text-yellow-500 uppercase tracking-wider font-semibold">Screen 2 (downstream) y</div>
+                    <input type="number" id="num-det2-x" class="num-input text-yellow-500 w-16" min="0" max="1000" step="1">
+                </div>
+                <input type="range" id="sld-det2-x" min="0" max="1000" step="1" class="mb-2">
+                <div id="detector2-label" class="font-mono text-yellow-500 font-bold text-sm">
+                    No Hit
+                </div>
+            </div>
+
+            <!-- True Offset -->
+            <div>
+                <div class="text-xs text-green-400 uppercase tracking-wider font-semibold mb-1">Beam Offset (S2 - S1)</div>
+                <div id="true-offset-label" class="font-mono text-green-400 font-bold text-lg">
+                    --
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Constants & Physics ---
+        const HC = 12.3984193; // Planck's constant * speed of light in keV * Å
+        const PRESETS = {
+            'Si111': 3.1356,
+            'Si220': 1.9201,
+            'Si311': 1.6375,
+            'Ge111': 3.2660
+        };
+
+        // --- Math & Geometry Utilities ---
+        const norm = (v) => {
+            const m = Math.hypot(v[0], v[1]);
+            return m === 0 ? v : [v[0] / m, v[1] / m];
+        };
+        const dot = (v1, v2) => v1[0] * v2[0] + v1[1] * v2[1];
+        const sub = (v1, v2) => [v1[0] - v2[0], v1[1] - v2[1]];
+        const add = (v1, v2) => [v1[0] + v2[0], v1[1] + v2[1]];
+        const mult = (v, s) => [v[0] * s, v[1] * s];
+        const reflect = (dir, normal) => sub(dir, mult(normal, 2 * dot(dir, normal)));
+
+        // --- Core Classes ---
+        class RectangleItem {
+            constructor(x, y, w, h, base_angle = 0, color = '#ffffff', rot_center = null) {
+                this.x = x;
+                this.y = y;
+                this.w = w;
+                this.h = h;
+                this.base_angle = base_angle;
+                this.angle = base_angle;
+                this.color = color;
+                this.rotation_center = rot_center;
+            }
+
+            getCorners() {
+                let corners = [
+                    [this.x, this.y],
+                    [this.x + this.w, this.y],
+                    [this.x + this.w, this.y + this.h],
+                    [this.x, this.y + this.h]
+                ];
+
+                if (this.angle !== 0) {
+                    const theta = this.angle * Math.PI / 180;
+                    const cos_t = Math.cos(theta), sin_t = Math.sin(theta);
+                    const cx = this.rotation_center ? this.rotation_center[0] : this.x + this.w / 2;
+                    const cy = this.rotation_center ? this.rotation_center[1] : this.y + this.h / 2;
+
+                    corners = corners.map(p => {
+                        const dx = p[0] - cx, dy = p[1] - cy;
+                        return [
+                            cos_t * dx - sin_t * dy + cx,
+                            sin_t * dx + cos_t * dy + cy
+                        ];
+                    });
+                }
+                return corners;
+            }
+
+            getEdges() {
+                const c = this.getCorners();
+                return [[c[0], c[1]], [c[1], c[2]], [c[2], c[3]], [c[3], c[0]]];
+            }
+
+            applyGlobalRotation(thetaOffset) {
+                this.angle = this.base_angle + thetaOffset;
+            }
+        }
+
+        class Ray {
+            constructor(start, angle_mrad, color = '#00ffff') {
+                this.start = start.slice();
+                this.angle = angle_mrad / 1000; // Convert mrad to radians
+                this.dir = norm([Math.cos(this.angle), Math.sin(this.angle)]);
+                this.color = color;
+                this.path = [this.start.slice()];
+            }
+
+            cast(rectangles, max_bounces = 20) {
+                let currentPoint = this.start.slice();
+                let direction = this.dir.slice();
+
+                for (let i = 0; i < max_bounces; i++) {
+                    const hit = this.findFirstHit(currentPoint, direction, rectangles);
+                    if (!hit.found) {
+                        this.path.push(add(currentPoint, mult(direction, 5000))); // far exit
+                        break;
+                    }
+                    this.path.push(hit.point);
+                    direction = reflect(direction, hit.normal);
+                    currentPoint = hit.point;
+                }
+            }
+
+            findFirstHit(origin, direction, rectangles) {
+                let closest = null;
+                let minDist = Infinity;
+                let closestNormal = null;
+
+                for (const rect of rectangles) {
+                    for (const [p1, p2] of rect.getEdges()) {
+                        const result = this.segmentIntersection(origin, direction, p1, p2);
+                        if (result && result.t < minDist) {
+                            minDist = result.t;
+                            closest = result.point;
+
+                            const edgeDir = norm(sub(p2, p1));
+                            let normal = [-edgeDir[1], edgeDir[0]];
+                            
+                            if (dot(normal, direction) > 0) normal = mult(normal, -1);
+                            closestNormal = normal;
+                        }
+                    }
+                }
+                return closest ? { found: true, normal: closestNormal, point: closest } : { found: false };
+            }
+
+            segmentIntersection(origin, dir, p1, p2) {
+                const v1 = sub(origin, p1);
+                const v2 = sub(p2, p1);
+                const v3 = [-dir[1], dir[0]];
+
+                const denom = dot(v2, v3);
+                if (Math.abs(denom) < 1e-6) return null;
+
+                const t1 = (v2[0] * v1[1] - v2[1] * v1[0]) / denom;
+                const t2 = dot(v1, v3) / denom;
+
+                if (t2 >= 0 && t2 <= 1 && t1 > 1e-4) {
+                    return { point: add(origin, mult(dir, t1)), t: t1 };
+                }
+                return null;
+            }
+
+            detectAtX(xTarget) {
+                for (let i = 1; i < this.path.length; i++) {
+                    const [x1, y1] = this.path[i - 1];
+                    const [x2, y2] = this.path[i];
+                    
+                    if ((x1 - xTarget) * (x2 - xTarget) <= 0 && x1 !== x2) {
+                        const t = (xTarget - x1) / (x2 - x1);
+                        return y1 + t * (y2 - y1);
+                    }
+                }
+                return null;
+            }
+        }
+
+        // --- Application State & Setup ---
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('canvas-container');
+
+        const viewW = 300; 
+        const viewH = 150; 
+
+        let crystals = [
+            new RectangleItem(-10, -10, 20, 10, 0, '#e5e7eb', [0, 0]), 
+            new RectangleItem(0, 10, 120, 10, 0, '#e5e7eb', [0, 0])   
+        ];
+
+        let state = {
+            dSpacing: PRESETS['Si111'],
+            beamSize: 3.0,
+            divergence: 0.0,
+            numRays: 3,
+            startX: -1000, startY: 0, rayAngle: 0,
+            rectRotation: 10.0,
+            rayAngleOffset: 0.0,
+            autoRayOffset: true,
+            c1Len: 40, c2Len: 120, thickness: 20,
+            c1X: 0, c1Y: 0,
+            c2X: 0, c2Y: 10,
+            c2Pitch: 0.0,
+            autoGap: false,
+            offsetH: 20.0,
+            det1X: -150.0,
+            det2X: 150.0,
+            zoom: 1.0,
+            showGrid: false,
+            viewCenterX: 50,
+            viewCenterY: 0
+        };
+
+        const bindings = [
+            { id: 'beam-size', key: 'beamSize' },
+            { id: 'divergence', key: 'divergence' },
+            { id: 'num-rays', key: 'numRays' },
+            { id: 'start-x', key: 'startX' },
+            { id: 'start-y', key: 'startY' },
+            { id: 'ray-angle', key: 'rayAngle' },
+            { id: 'ray-angle-offset', key: 'rayAngleOffset' },
+            { id: 'c1-len', key: 'c1Len' },
+            { id: 'c2-len', key: 'c2Len' },
+            { id: 'thickness', key: 'thickness' },
+            { id: 'rect-angle', key: 'rectRotation' },
+            { id: 'c1-x', key: 'c1X' },
+            { id: 'c1-y', key: 'c1Y' },
+            { id: 'c2-x', key: 'c2X' },
+            { id: 'c2-y', key: 'c2Y' },
+            { id: 'c2-pitch', key: 'c2Pitch' },
+            { id: 'offset-h', key: 'offsetH' },
+            { id: 'det1-x', key: 'det1X' },
+            { id: 'det2-x', key: 'det2X' }
+        ];
+
+        // --- Physics Calculations ---
+        function calculatePhysics() {
+            // True Bragg Angle = Goniometer Angle - Ray Angle Offset
+            const rayAngleOffsetDeg = (state.rayAngleOffset / 1000) * (180 / Math.PI);
+            const trueBraggDeg = state.rectRotation - rayAngleOffsetDeg;
+            const thetaRad = trueBraggDeg * Math.PI / 180;
+            const lambda = 2 * state.dSpacing * Math.sin(thetaRad);
+            
+            const lblTrueBragg = document.getElementById('lbl-true-bragg');
+            const lblLambda = document.getElementById('lbl-wavelength');
+            const numEnergy = document.getElementById('num-energy');
+
+            if (lblTrueBragg) {
+                lblTrueBragg.textContent = trueBraggDeg.toFixed(3) + '°';
+            }
+
+            if (thetaRad <= 0 || lambda <= 0) {
+                lblLambda.textContent = "N/A";
+                if (document.activeElement !== numEnergy) numEnergy.value = "";
+                return;
+            }
+
+            const energy = HC / lambda;
+            lblLambda.textContent = lambda.toFixed(4);
+            
+            // Only update energy input if the user isn't actively typing in it
+            if (document.activeElement !== numEnergy) {
+                numEnergy.value = energy.toFixed(3);
+            }
+        }
+
+        function setAngleFromEnergy(energykeV) {
+            if (energykeV <= 0) return;
+            const lambda = HC / energykeV;
+            const sinTheta = lambda / (2 * state.dSpacing);
+            
+            if (sinTheta > 1) {
+                alert("Energy too low! Cannot diffract at this energy for the given d-spacing.");
+                return;
+            }
+
+            const thetaRad = Math.asin(sinTheta);
+            const trueBraggDeg = thetaRad * 180 / Math.PI;
+            const rayAngleOffsetDeg = (state.rayAngleOffset / 1000) * (180 / Math.PI);
+            
+            // Goniometer angle needs to compensate for the ray angle offset
+            state.rectRotation = trueBraggDeg + rayAngleOffsetDeg;
+            
+            // Sync UI angle sliders
+            document.getElementById('num-rect-angle').value = state.rectRotation.toFixed(3);
+            document.getElementById('sld-rect-angle').value = state.rectRotation;
+            
+            updateSimulation();
+        }
+
+        // --- Rendering Logic ---
+        function resize() {
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            draw();
+        }
+
+        function getTransform() {
+            const baseScale = Math.min(canvas.width / viewW, canvas.height / viewH) * 0.95;
+            const scale = baseScale * state.zoom;
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            
+            return function(x, y) {
+                return [
+                    cx + (x - state.viewCenterX) * scale,
+                    cy - (y - state.viewCenterY) * scale
+                ];
+            };
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const toScreen = getTransform();
+
+            const baseScale = Math.min(canvas.width / viewW, canvas.height / viewH) * 0.95;
+            const scale = baseScale * state.zoom;
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            
+            const physMinX = state.viewCenterX + (0 - cx) / scale;
+            const physMaxX = state.viewCenterX + (canvas.width - cx) / scale;
+            const physMaxY = state.viewCenterY - (0 - cy) / scale;
+            const physMinY = state.viewCenterY - (canvas.height - cy) / scale;
+
+            // Draw 10mm x 10mm Grid Overlay
+            if (state.showGrid) {
+                const startX = Math.floor(physMinX / 10) * 10;
+                const endX = Math.ceil(physMaxX / 10) * 10;
+                const startY = Math.floor(physMinY / 10) * 10;
+                const endY = Math.ceil(physMaxY / 10) * 10;
+
+                ctx.beginPath();
+                ctx.strokeStyle = '#1f2937';
+                ctx.lineWidth = 1;
+                
+                for (let x = startX; x <= endX; x += 10) {
+                    let p1 = toScreen(x, physMinY);
+                    let p2 = toScreen(x, physMaxY);
+                    ctx.moveTo(p1[0], p1[1]);
+                    ctx.lineTo(p2[0], p2[1]);
+                }
+                
+                for (let y = startY; y <= endY; y += 10) {
+                    let p1 = toScreen(physMinX, y);
+                    let p2 = toScreen(physMaxX, y);
+                    ctx.moveTo(p1[0], p1[1]);
+                    ctx.lineTo(p2[0], p2[1]);
+                }
+                ctx.stroke();
+            }
+
+            // Draw Axes
+            ctx.beginPath();
+            ctx.strokeStyle = '#374151';
+            ctx.lineWidth = 1;
+            
+            const xLeft = toScreen(physMinX, 0);
+            const xRight = toScreen(physMaxX, 0);
+            ctx.moveTo(xLeft[0], xLeft[1]);
+            ctx.lineTo(xRight[0], xRight[1]);
+            
+            const yTop = toScreen(0, physMaxY);
+            const yBot = toScreen(0, physMinY);
+            ctx.moveTo(yTop[0], yTop[1]);
+            ctx.lineTo(yBot[0], yBot[1]);
+            ctx.stroke();
+
+            // Center of rotation marker
+            ctx.beginPath();
+            const originScreen = toScreen(0, 0);
+            ctx.arc(originScreen[0], originScreen[1], 4, 0, Math.PI * 2);
+            ctx.fillStyle = '#6b7280';
+            ctx.fill();
+
+            // Screen 1 line (Input)
+            ctx.beginPath();
+            ctx.setLineDash([5, 5]);
+            const pTop1 = toScreen(state.det1X, physMaxY);
+            const pBot1 = toScreen(state.det1X, physMinY);
+            ctx.moveTo(pTop1[0], pTop1[1]);
+            ctx.lineTo(pBot1[0], pBot1[1]);
+            ctx.strokeStyle = '#3b82f6'; // Tailwind blue-500
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Screen 2 line (Output)
+            ctx.beginPath();
+            const pTop2 = toScreen(state.det2X, physMaxY);
+            const pBot2 = toScreen(state.det2X, physMinY);
+            ctx.moveTo(pTop2[0], pTop2[1]);
+            ctx.lineTo(pBot2[0], pBot2[1]);
+            ctx.strokeStyle = '#eab308'; // Tailwind yellow-500
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Draw Crystals
+            for (const rect of crystals) {
+                const pts = rect.getCorners().map(p => toScreen(p[0], p[1]));
+                ctx.beginPath();
+                ctx.moveTo(pts[0][0], pts[0][1]);
+                for(let i=1; i<4; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+                ctx.closePath();
+                ctx.strokeStyle = rect.color;
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                const cx = rect.rotation_center ? rect.rotation_center[0] : rect.x + rect.w/2;
+                const cy = rect.rotation_center ? rect.rotation_center[1] : rect.y + rect.h/2;
+                const cp = toScreen(cx, cy);
+                
+                ctx.beginPath();
+                ctx.moveTo(cp[0] - 4, cp[1] - 4); ctx.lineTo(cp[0] + 4, cp[1] + 4);
+                ctx.moveTo(cp[0] + 4, cp[1] - 4); ctx.lineTo(cp[0] - 4, cp[1] + 4);
+                ctx.strokeStyle = '#eab308';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            // Draw Rays dynamically
+            const s = state.beamSize;
+            const n = Math.max(1, Math.round(state.numRays));
+            const divMrad = state.divergence / 1000;
+            let offsets = [];
+            let angleOffsets = [];
+            
+            if (n === 1) {
+                offsets = [0]; // Force single chief ray
+                angleOffsets = [0];
+            } else {
+                // Distribute rays evenly.
+                // Odd 'n' naturally generates a 0 offset in the middle.
+                // Even 'n' naturally skips 0.
+                for (let i = 0; i < n; i++) {
+                    offsets.push(-s/2 + i * (s / (n - 1)));
+                    angleOffsets.push(-divMrad/2 + i * (divMrad / (n - 1)));
+                }
+            }
+            
+            const rays = offsets.map((off, i) => 
+                new Ray([state.startX, state.startY + off], state.rayAngle + angleOffsets[i])
+            );
+
+            ctx.lineWidth = 1;
+            for (const ray of rays) {
+                ray.cast(crystals);
+                
+                ctx.beginPath();
+                const p0 = toScreen(ray.path[0][0], ray.path[0][1]);
+                ctx.moveTo(p0[0], p0[1]);
+                
+                for (let i = 1; i < ray.path.length; i++) {
+                    const p = toScreen(ray.path[i][0], ray.path[i][1]);
+                    ctx.lineTo(p[0], p[1]);
+                }
+                ctx.strokeStyle = ray.color;
+                ctx.stroke();
+            }
+
+            // Update Screen Status using a dedicated invisible central mathematical ray
+            // This ensures readouts are perfectly accurate regardless of whether we draw the chief ray or not.
+            const centralRay = new Ray([state.startX, state.startY], state.rayAngle);
+            centralRay.cast(crystals);
+            
+            // Input Screen (S1)
+            const yHit1 = centralRay.detectAtX(state.det1X);
+            const detector1Label = document.getElementById('detector1-label');
+            if (yHit1 !== null) {
+                detector1Label.textContent = `Position = ${yHit1.toFixed(3)} mm`;
+                detector1Label.className = "font-mono text-blue-300 font-bold text-sm";
+            } else {
+                detector1Label.textContent = "No Hit";
+                detector1Label.className = "font-mono text-gray-500 font-bold text-sm";
+            }
+
+            // Output Screen (S2)
+            const yHit2 = centralRay.detectAtX(state.det2X);
+            const detector2Label = document.getElementById('detector2-label');
+            if (yHit2 !== null) {
+                detector2Label.textContent = `Position = ${yHit2.toFixed(3)} mm`;
+                detector2Label.className = "font-mono text-yellow-400 font-bold text-sm";
+            } else {
+                detector2Label.textContent = "No Hit";
+                detector2Label.className = "font-mono text-gray-500 font-bold text-sm";
+            }
+
+            // True Offset calculation
+            const offsetLabel = document.getElementById('true-offset-label');
+            if (yHit1 !== null && yHit2 !== null) {
+                const trueOffset = yHit2 - yHit1;
+                offsetLabel.textContent = `${trueOffset.toFixed(3)} mm`;
+                offsetLabel.className = "font-mono text-green-400 font-bold text-lg";
+            } else {
+                offsetLabel.textContent = "--";
+                offsetLabel.className = "font-mono text-gray-500 font-bold text-lg";
+            }
+        }
+
+        function updateSimulation() {
+            // Apply auto ray angle offset if enabled
+            if (state.autoRayOffset) {
+                state.rayAngleOffset = state.rayAngle;
+                const numRayOff = document.getElementById('num-ray-angle-offset');
+                const sldRayOff = document.getElementById('sld-ray-angle-offset');
+                if (numRayOff && sldRayOff) {
+                    numRayOff.value = state.rayAngleOffset;
+                    sldRayOff.value = state.rayAngleOffset;
+                }
+            }
+
+            // Recalculate physics text
+            calculatePhysics();
+
+            // Apply auto-gap calculation if enabled
+            if (state.autoGap) {
+                // Calculate True Bragg Angle for the gap geometry
+                const rayAngleOffsetDeg = (state.rayAngleOffset / 1000) * (180 / Math.PI);
+                const trueBraggDeg = state.rectRotation - rayAngleOffsetDeg;
+                const thetaRad = trueBraggDeg * Math.PI / 180;
+                const cosTheta = Math.cos(thetaRad);
+                
+                if (Math.abs(cosTheta) > 0.001) {
+                    state.c2Y = state.offsetH / (2 * cosTheta);
+                }
+                
+                const numC2Y = document.getElementById('num-c2-y');
+                const sldC2Y = document.getElementById('sld-c2-y');
+                if (numC2Y && sldC2Y) {
+                    numC2Y.value = state.c2Y.toFixed(2);
+                    sldC2Y.value = state.c2Y;
+                }
+            }
+
+            // Update Crystal Dimensions & Apply transformations
+            crystals[0].w = state.c1Len;
+            crystals[0].h = state.thickness;
+            crystals[0].x = state.c1X - state.c1Len / 2;
+            crystals[0].y = state.c1Y - state.thickness;
+            
+            crystals[1].w = state.c2Len;
+            crystals[1].h = state.thickness;
+            crystals[1].x = state.c2X;
+            crystals[1].y = state.c2Y;
+            
+            crystals[0].applyGlobalRotation(state.rectRotation);
+            crystals[1].applyGlobalRotation(state.rectRotation + (state.c2Pitch / 1000000) * (180 / Math.PI));
+
+            if (document.getElementById('lcd-rect-angle')) {
+                document.getElementById('lcd-rect-angle').textContent = state.rectRotation.toFixed(3) + '°';
+            }
+
+            draw();
+        }
+
+        // --- Event Binding ---
+        // Crystal Optics
+        const selCrystal = document.getElementById('sel-crystal-type');
+        const numDSpacing = document.getElementById('num-d-spacing');
+        const numEnergy = document.getElementById('num-energy');
+
+        selCrystal.addEventListener('change', (e) => {
+            if (e.target.value === 'custom') {
+                numDSpacing.disabled = false;
+            } else {
+                numDSpacing.disabled = true;
+                state.dSpacing = PRESETS[e.target.value];
+                numDSpacing.value = state.dSpacing.toFixed(4);
+                updateSimulation();
+            }
+        });
+
+        numDSpacing.addEventListener('input', (e) => {
+            state.dSpacing = parseFloat(e.target.value) || 1.0;
+            updateSimulation();
+        });
+
+        // Trigger angle change based on Energy input
+        numEnergy.addEventListener('change', (e) => {
+            const val = parseFloat(e.target.value);
+            if (!isNaN(val)) setAngleFromEnergy(val);
+        });
+        numEnergy.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const val = parseFloat(e.target.value);
+                if (!isNaN(val)) setAngleFromEnergy(val);
+            }
+        });
+
+        // Standard Sliders
+        bindings.forEach(b => {
+            const num = document.getElementById(`num-${b.id}`);
+            const sld = document.getElementById(`sld-${b.id}`);
+            if (!num || !sld) return;
+
+            num.value = state[b.key];
+            sld.value = state[b.key];
+
+            num.addEventListener('input', (e) => {
+                let v = parseFloat(e.target.value);
+                if (!isNaN(v)) {
+                    sld.value = v;
+                    state[b.key] = v;
+                    updateSimulation();
+                }
+            });
+
+            sld.addEventListener('input', (e) => {
+                let v = parseFloat(e.target.value);
+                num.value = v;
+                state[b.key] = v;
+                updateSimulation();
+            });
+        });
+
+        // Pan & Zoom logic
+        window.addEventListener('resize', resize);
+        
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomSpeed = 0.1;
+            if (e.deltaY < 0) state.zoom *= (1 + zoomSpeed);
+            else state.zoom /= (1 + zoomSpeed);
+            state.zoom = Math.max(0.1, Math.min(state.zoom, 10));
+            draw();
+        }, { passive: false });
+
+        let isDragging = false, lastMouseX = 0, lastMouseY = 0;
+        canvas.style.cursor = 'grab';
+
+        canvas.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+            canvas.style.cursor = 'grabbing';
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const dx = e.clientX - lastMouseX;
+            const dy = e.clientY - lastMouseY;
+            lastMouseX = e.clientX; lastMouseY = e.clientY;
+
+            const baseScale = Math.min(canvas.width / viewW, canvas.height / viewH) * 0.95;
+            const scale = baseScale * state.zoom;
+
+            state.viewCenterX -= dx / scale;
+            state.viewCenterY += dy / scale; 
+            draw();
+        });
+
+        window.addEventListener('mouseup', () => { isDragging = false; canvas.style.cursor = 'grab'; });
+
+        // Toggles
+        document.getElementById('btn-toggle-grid').addEventListener('click', () => {
+            state.showGrid = !state.showGrid;
+            draw();
+        });
+
+        document.getElementById('btn-auto-ray-offset').addEventListener('click', (e) => {
+            state.autoRayOffset = !state.autoRayOffset;
+            const btn = e.target;
+            const numRayOff = document.getElementById('num-ray-angle-offset');
+            const sldRayOff = document.getElementById('sld-ray-angle-offset');
+
+            if (state.autoRayOffset) {
+                btn.textContent = 'Auto: ON';
+                btn.className = 'ml-2 text-[10px] px-2 py-0.5 rounded border border-blue-500 bg-blue-900/50 text-blue-300 transition-colors focus:outline-none';
+                numRayOff.disabled = true; sldRayOff.disabled = true;
+                numRayOff.classList.add('opacity-50', 'cursor-not-allowed');
+                sldRayOff.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                btn.textContent = 'Auto: OFF';
+                btn.className = 'ml-2 text-[10px] px-2 py-0.5 rounded border border-gray-600 bg-gray-800 text-gray-400 hover:text-white transition-colors focus:outline-none';
+                numRayOff.disabled = false; sldRayOff.disabled = false;
+                numRayOff.classList.remove('opacity-50', 'cursor-not-allowed');
+                sldRayOff.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+            updateSimulation();
+        });
+
+        document.getElementById('btn-auto-gap').addEventListener('click', (e) => {
+            state.autoGap = !state.autoGap;
+            const btn = e.target;
+            const containerH = document.getElementById('container-offset-h');
+            const numC2Y = document.getElementById('num-c2-y');
+            const sldC2Y = document.getElementById('sld-c2-y');
+
+            if (state.autoGap) {
+                btn.textContent = 'Auto: ON';
+                btn.className = 'ml-2 text-[10px] px-2 py-0.5 rounded border border-blue-500 bg-blue-900/50 text-blue-300 transition-colors focus:outline-none';
+                containerH.classList.remove('hidden');
+                numC2Y.disabled = true; sldC2Y.disabled = true;
+                numC2Y.classList.add('opacity-50', 'cursor-not-allowed');
+                sldC2Y.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                btn.textContent = 'Auto: OFF';
+                btn.className = 'ml-2 text-[10px] px-2 py-0.5 rounded border border-gray-600 bg-gray-800 text-gray-400 hover:text-white transition-colors focus:outline-none';
+                containerH.classList.add('hidden');
+                numC2Y.disabled = false; sldC2Y.disabled = false;
+                numC2Y.classList.remove('opacity-50', 'cursor-not-allowed');
+                sldC2Y.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+            updateSimulation();
+        });
+
+        // Initialize
+        resize();
+        updateSimulation();
+
+    </script>
+</body>
+</html>
