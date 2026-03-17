@@ -92,8 +92,9 @@
                     <div class="pt-2 border-t border-blue-500/20">
                         <div class="flex justify-between items-center mb-1">
                             <label class="text-xs font-semibold text-yellow-400">Energy (keV)</label>
-                            <input type="number" id="num-energy" class="num-input font-bold text-yellow-400" min="1" max="150" step="0.01">
+                            <input type="number" id="num-energy" class="num-input font-bold text-yellow-400" min="1" max="50" step="0.1">
                         </div>
+                        <input type="range" id="sld-energy" min="1" max="50" step="0.1">
                         <div class="flex justify-between items-center mt-2">
                             <label class="text-xs text-gray-400">Wavelength (Å)</label>
                             <span id="lbl-wavelength" class="text-xs font-mono text-gray-300">--</span>
@@ -555,6 +556,7 @@
             const lblTrueBragg = document.getElementById('lbl-true-bragg');
             const lblLambda = document.getElementById('lbl-wavelength');
             const numEnergy = document.getElementById('num-energy');
+            const sldEnergy = document.getElementById('sld-energy');
 
             if (lblTrueBragg) {
                 lblTrueBragg.textContent = trueBraggDeg.toFixed(3) + '°';
@@ -562,29 +564,38 @@
 
             if (thetaRad <= 0 || lambda <= 0) {
                 lblLambda.textContent = "N/A";
-                if (document.activeElement !== numEnergy) numEnergy.value = "";
+                // Only clear if user isn't actively interacting with the inputs
+                if (document.activeElement !== numEnergy && document.activeElement !== sldEnergy) {
+                    numEnergy.value = "";
+                }
                 return;
             }
 
             const energy = HC / lambda;
             lblLambda.textContent = lambda.toFixed(4);
             
-            // Only update energy input if the user isn't actively typing in it
-            if (document.activeElement !== numEnergy) {
+            // Only update energy inputs if the user isn't actively typing or dragging them
+            if (document.activeElement !== numEnergy && document.activeElement !== sldEnergy) {
                 numEnergy.value = energy.toFixed(3);
+                sldEnergy.value = energy;
             }
         }
 
         function setAngleFromEnergy(energykeV) {
             if (energykeV <= 0) return;
+            
+            // Absolute lowest allowable energy based on Crystal d-spacing (sinTheta <= 1)
+            const minAllowedEnergy = HC / (2 * state.dSpacing);
+            if (energykeV < minAllowedEnergy) {
+                energykeV = minAllowedEnergy;
+                // Snap slider/input to minimum valid value to prevent NaNs and alert popups
+                document.getElementById('num-energy').value = energykeV.toFixed(3);
+                document.getElementById('sld-energy').value = energykeV;
+            }
+
             const lambda = HC / energykeV;
             const sinTheta = lambda / (2 * state.dSpacing);
             
-            if (sinTheta > 1) {
-                alert("Energy too low! Cannot diffract at this energy for the given d-spacing.");
-                return;
-            }
-
             const thetaRad = Math.asin(sinTheta);
             const trueBraggDeg = thetaRad * 180 / Math.PI;
             const rayAngleOffsetDeg = (state.rayAngleOffset / 1000) * (180 / Math.PI);
@@ -770,7 +781,6 @@
             }
 
             // Update Screen Status using a dedicated invisible central mathematical ray
-            // This ensures readouts are perfectly accurate regardless of whether we draw the chief ray or not.
             const centralRay = new Ray([state.startX, state.startY], state.rayAngle);
             centralRay.cast(crystals);
             
@@ -869,6 +879,7 @@
         const selCrystal = document.getElementById('sel-crystal-type');
         const numDSpacing = document.getElementById('num-d-spacing');
         const numEnergy = document.getElementById('num-energy');
+        const sldEnergy = document.getElementById('sld-energy');
 
         selCrystal.addEventListener('change', (e) => {
             if (e.target.value === 'custom') {
@@ -886,15 +897,20 @@
             updateSimulation();
         });
 
-        // Trigger angle change based on Energy input
-        numEnergy.addEventListener('change', (e) => {
+        // Trigger angle change based on Energy inputs
+        numEnergy.addEventListener('input', (e) => {
             const val = parseFloat(e.target.value);
-            if (!isNaN(val)) setAngleFromEnergy(val);
+            if (!isNaN(val)) {
+                sldEnergy.value = val;
+                setAngleFromEnergy(val);
+            }
         });
-        numEnergy.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                const val = parseFloat(e.target.value);
-                if (!isNaN(val)) setAngleFromEnergy(val);
+
+        sldEnergy.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            if (!isNaN(val)) {
+                numEnergy.value = val;
+                setAngleFromEnergy(val);
             }
         });
 
