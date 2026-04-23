@@ -55,12 +55,41 @@
         }
         
         canvas { display: block; }
+
+        /* Light Mode & UI State Overrides */
+        body.light-mode { background-color: #f3f4f6; color: #111827; }
+        body.light-mode .bg-gray-950 { background-color: #f3f4f6; }
+        body.light-mode .bg-gray-900 { background-color: #ffffff; }
+        body.light-mode .bg-gray-800\/50 { background-color: #ffffff; border-color: #e5e7eb; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        body.light-mode .border-gray-800,
+        body.light-mode .border-gray-700,
+        body.light-mode .border-gray-700\/50 { border-color: #e5e7eb; }
+        body.light-mode .text-gray-200 { color: #1f2937; }
+        body.light-mode .text-gray-300 { color: #374151; }
+        body.light-mode .text-gray-400 { color: #4b5563; }
+        body.light-mode .text-gray-500 { color: #6b7280; }
+        body.light-mode .num-input { background-color: #f9fafb; border-color: #d1d5db; color: #111827; }
+        body.light-mode .num-input:focus { border-color: #3b82f6; }
+        body.light-mode .bg-black { background-color: #e5e7eb; }
+        body.light-mode .bg-gray-900\/90 { background-color: rgba(255, 255, 255, 0.9); border-color: #d1d5db; }
+        body.light-mode .bg-gray-800 { background-color: #ffffff; color: #374151; border-color: #d1d5db; }
+        body.light-mode .hover\:bg-gray-700:hover { background-color: #f3f4f6; }
+        
+        .panel-hidden {
+            transform: translateX(-100%);
+            width: 0 !important;
+            border: none !important;
+            overflow: hidden;
+        }
+        #left-panel {
+            transition: transform 0.3s ease, width 0.3s ease;
+        }
     </style>
 </head>
 <body class="flex h-screen bg-gray-950 text-gray-200 overflow-hidden">
 
     <!-- Left GUI Panel -->
-    <div class="w-80 bg-gray-900 border-r border-gray-800 flex flex-col shadow-2xl z-10 shrink-0">
+    <div id="left-panel" class="w-80 bg-gray-900 border-r border-gray-800 flex flex-col shadow-2xl z-10 shrink-0">
         <div class="p-5 border-b border-gray-800 bg-gray-900">
             <h1 class="text-xl font-bold text-blue-400 tracking-wide">DCM Simulator</h1>
             <p class="text-xs text-gray-500 mt-1">X-ray Optics & Geometry</p>
@@ -103,6 +132,42 @@
                 </div>
             </div>
             
+            <!-- Goniometer Angle -->
+            <div class="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
+                <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4 flex items-center">
+                    <svg class="w-4 h-4 mr-2 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    Goniometer Angle
+                </h2>
+                <div>
+                    <div class="flex justify-between gap-2 mb-4">
+                        <div class="flex-1 text-center bg-gray-950 border border-gray-800 rounded p-2 shadow-inner">
+                            <div class="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Goniometer</div>
+                            <div id="lcd-rect-angle" class="font-mono text-xl font-bold text-green-400">00.000°</div>
+                        </div>
+                        <div class="flex-1 text-center bg-gray-950 border border-gray-800 rounded p-2 shadow-inner">
+                            <div class="text-[10px] text-gray-500 uppercase tracking-wider mb-1">True Bragg</div>
+                            <div id="lbl-true-bragg" class="font-mono text-xl font-bold text-blue-400">00.000°</div>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-xs text-gray-400">Angle θ (°)</label>
+                        <input type="number" id="num-rect-angle" class="num-input text-green-400" min="0" max="89" step="0.001">
+                    </div>
+                    <input type="range" id="sld-rect-angle" min="0" max="89" step="0.001" class="mb-4">
+                    
+                    <div class="pt-2 border-t border-gray-700/50">
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs text-gray-400 flex items-center">
+                                Ray Angle Offset (mrad)
+                                <button id="btn-auto-ray-offset" class="ml-2 text-[10px] px-2 py-0.5 rounded border border-blue-500 bg-blue-900/50 text-blue-300 transition-colors focus:outline-none">Auto: ON</button>
+                            </label>
+                            <input type="number" id="num-ray-angle-offset" class="num-input text-cyan-400 opacity-50 cursor-not-allowed" min="-35" max="35" step="0.1" disabled>
+                        </div>
+                        <input type="range" id="sld-ray-angle-offset" min="-35" max="35" step="0.1" class="opacity-50 cursor-not-allowed" disabled>
+                    </div>
+                </div>
+            </div>
+
             <!-- Ray Controls -->
             <div class="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
                 <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4 flex items-center">
@@ -186,38 +251,26 @@
                 </div>
             </div>
 
-            <!-- Goniometer Angle -->
+            <!-- Global Stage Offset -->
             <div class="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
                 <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4 flex items-center">
-                    <svg class="w-4 h-4 mr-2 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                    Goniometer Angle
+                    <svg class="w-4 h-4 mr-2 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"></path></svg>
+                    Global Stage Offset
                 </h2>
-                <div>
-                    <div class="flex justify-between gap-2 mb-4">
-                        <div class="flex-1 text-center bg-gray-950 border border-gray-800 rounded p-2 shadow-inner">
-                            <div class="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Goniometer</div>
-                            <div id="lcd-rect-angle" class="font-mono text-xl font-bold text-green-400">00.000°</div>
-                        </div>
-                        <div class="flex-1 text-center bg-gray-950 border border-gray-800 rounded p-2 shadow-inner">
-                            <div class="text-[10px] text-gray-500 uppercase tracking-wider mb-1">True Bragg</div>
-                            <div id="lbl-true-bragg" class="font-mono text-xl font-bold text-blue-400">00.000°</div>
-                        </div>
-                    </div>
-                    <div class="flex justify-between items-center mb-1">
-                        <label class="text-xs text-gray-400">Angle θ (°)</label>
-                        <input type="number" id="num-rect-angle" class="num-input text-green-400" min="0" max="89" step="0.001">
-                    </div>
-                    <input type="range" id="sld-rect-angle" min="0" max="89" step="0.001" class="mb-4">
-                    
-                    <div class="pt-2 border-t border-gray-700/50">
+                <div class="space-y-4">
+                    <div>
                         <div class="flex justify-between items-center mb-1">
-                            <label class="text-xs text-gray-400 flex items-center">
-                                Ray Angle Offset (mrad)
-                                <button id="btn-auto-ray-offset" class="ml-2 text-[10px] px-2 py-0.5 rounded border border-blue-500 bg-blue-900/50 text-blue-300 transition-colors focus:outline-none">Auto: ON</button>
-                            </label>
-                            <input type="number" id="num-ray-angle-offset" class="num-input text-cyan-400 opacity-50 cursor-not-allowed" min="-35" max="35" step="0.1" disabled>
+                            <label class="text-xs text-gray-400">Global X (mm)</label>
+                            <input type="number" id="num-global-x" class="num-input text-teal-400" min="-1000" max="1000" step="1">
                         </div>
-                        <input type="range" id="sld-ray-angle-offset" min="-35" max="35" step="0.1" class="opacity-50 cursor-not-allowed" disabled>
+                        <input type="range" id="sld-global-x" min="-1000" max="1000" step="1">
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs text-gray-400">Global Y (mm)</label>
+                            <input type="number" id="num-global-y" class="num-input text-teal-400" min="-100" max="100" step="0.1">
+                        </div>
+                        <input type="range" id="sld-global-y" min="-100" max="100" step="0.1">
                     </div>
                 </div>
             </div>
@@ -231,14 +284,14 @@
                 <div class="space-y-4">
                     <div>
                         <div class="flex justify-between items-center mb-1">
-                            <label class="text-xs text-gray-400">Home X (mm)</label>
+                            <label class="text-xs text-gray-400">Local C1 X (mm)</label>
                             <input type="number" id="num-c1-x" class="num-input text-orange-400" min="-100" max="100" step="0.1">
                         </div>
                         <input type="range" id="sld-c1-x" min="-100" max="100" step="0.1">
                     </div>
                     <div>
                         <div class="flex justify-between items-center mb-1">
-                            <label class="text-xs text-gray-400">Home Y (mm)</label>
+                            <label class="text-xs text-gray-400">Local C1 Y (mm)</label>
                             <input type="number" id="num-c1-y" class="num-input text-orange-400" min="-100" max="100" step="0.1">
                         </div>
                         <input type="range" id="sld-c1-y" min="-100" max="100" step="0.1">
@@ -296,10 +349,17 @@
     <div class="flex-1 relative bg-black" id="canvas-container">
         <canvas id="simCanvas" class="absolute inset-0 w-full h-full"></canvas>
         
-        <!-- Toggle Grid Button -->
-        <div class="absolute top-6 left-6 z-10">
+        <!-- Top Left Controls -->
+        <div class="absolute top-6 left-6 z-10 flex gap-2">
+            <button id="btn-toggle-ui" class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded border border-gray-600 shadow-sm text-xs font-semibold tracking-wide transition-colors flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="mr-1.5" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/></svg>
+                UI
+            </button>
+            <button id="btn-toggle-theme" class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded border border-gray-600 shadow-sm text-xs font-semibold tracking-wide transition-colors">
+                Day/Night
+            </button>
             <button id="btn-toggle-grid" class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded border border-gray-600 shadow-sm text-xs font-semibold tracking-wide transition-colors">
-                Toggle Grid
+                Grid
             </button>
         </div>
 
@@ -509,6 +569,7 @@
             rectRotation: 10.0,
             rayAngleOffset: 0.0,
             autoRayOffset: true,
+            globalX: 0.0, globalY: 0.0,
             c1Len: 40, c2Len: 120, thickness: 20,
             c1X: 0, c1Y: 0,
             c2X: 0, c2Y: 10,
@@ -520,7 +581,9 @@
             zoom: 1.0,
             showGrid: false,
             viewCenterX: 50,
-            viewCenterY: 0
+            viewCenterY: 0,
+            isLightMode: false,
+            uiVisible: true
         };
 
         const bindings = [
@@ -531,6 +594,8 @@
             { id: 'start-y', key: 'startY' },
             { id: 'ray-angle', key: 'rayAngle' },
             { id: 'ray-angle-offset', key: 'rayAngleOffset' },
+            { id: 'global-x', key: 'globalX' },
+            { id: 'global-y', key: 'globalY' },
             { id: 'c1-len', key: 'c1Len' },
             { id: 'c2-len', key: 'c2Len' },
             { id: 'thickness', key: 'thickness' },
@@ -653,7 +718,7 @@
                 const endY = Math.ceil(physMaxY / 10) * 10;
 
                 ctx.beginPath();
-                ctx.strokeStyle = '#1f2937';
+                ctx.strokeStyle = state.isLightMode ? '#d1d5db' : '#1f2937';
                 ctx.lineWidth = 1;
                 
                 for (let x = startX; x <= endX; x += 10) {
@@ -674,7 +739,7 @@
 
             // Draw Axes
             ctx.beginPath();
-            ctx.strokeStyle = '#374151';
+            ctx.strokeStyle = state.isLightMode ? '#9ca3af' : '#374151';
             ctx.lineWidth = 1;
             
             const xLeft = toScreen(physMinX, 0);
@@ -688,11 +753,11 @@
             ctx.lineTo(yBot[0], yBot[1]);
             ctx.stroke();
 
-            // Center of rotation marker
+            // Center of rotation marker (shifted by Global Stage Offset)
             ctx.beginPath();
-            const originScreen = toScreen(0, 0);
+            const originScreen = toScreen(state.globalX, state.globalY);
             ctx.arc(originScreen[0], originScreen[1], 4, 0, Math.PI * 2);
-            ctx.fillStyle = '#6b7280';
+            ctx.fillStyle = state.isLightMode ? '#9ca3af' : '#6b7280';
             ctx.fill();
 
             // Screen 1 line (Input)
@@ -724,7 +789,7 @@
                 ctx.moveTo(pts[0][0], pts[0][1]);
                 for(let i=1; i<4; i++) ctx.lineTo(pts[i][0], pts[i][1]);
                 ctx.closePath();
-                ctx.strokeStyle = rect.color;
+                ctx.strokeStyle = state.isLightMode ? '#4b5563' : rect.color;
                 ctx.lineWidth = 1.5;
                 ctx.stroke();
 
@@ -752,8 +817,6 @@
                 angleOffsets = [0];
             } else {
                 // Distribute rays evenly.
-                // Odd 'n' naturally generates a 0 offset in the middle.
-                // Even 'n' naturally skips 0.
                 for (let i = 0; i < n; i++) {
                     offsets.push(-s/2 + i * (s / (n - 1)));
                     angleOffsets.push(-divMrad/2 + i * (divMrad / (n - 1)));
@@ -853,16 +916,19 @@
                 }
             }
 
-            // Update Crystal Dimensions & Apply transformations
+            // Update Crystal Dimensions & Apply Transformations
+            // crystals position incorporates local shift + global shift
             crystals[0].w = state.c1Len;
             crystals[0].h = state.thickness;
-            crystals[0].x = state.c1X - state.c1Len / 2;
-            crystals[0].y = state.c1Y - state.thickness;
+            crystals[0].x = state.c1X - state.c1Len / 2 + state.globalX;
+            crystals[0].y = state.c1Y - state.thickness + state.globalY;
+            crystals[0].rotation_center = [state.globalX, state.globalY];
             
             crystals[1].w = state.c2Len;
             crystals[1].h = state.thickness;
-            crystals[1].x = state.c2X;
-            crystals[1].y = state.c2Y;
+            crystals[1].x = state.c2X + state.globalX;
+            crystals[1].y = state.c2Y + state.globalY;
+            crystals[1].rotation_center = [state.globalX, state.globalY];
             
             crystals[0].applyGlobalRotation(state.rectRotation);
             crystals[1].applyGlobalRotation(state.rectRotation + (state.c2Pitch / 1000000) * (180 / Math.PI));
@@ -979,6 +1045,27 @@
         window.addEventListener('mouseup', () => { isDragging = false; canvas.style.cursor = 'grab'; });
 
         // Toggles
+        document.getElementById('btn-toggle-ui').addEventListener('click', () => {
+            state.uiVisible = !state.uiVisible;
+            const panel = document.getElementById('left-panel');
+            if (state.uiVisible) {
+                panel.classList.remove('panel-hidden');
+            } else {
+                panel.classList.add('panel-hidden');
+            }
+            setTimeout(resize, 350); // resize canvas after css transition
+        });
+
+        document.getElementById('btn-toggle-theme').addEventListener('click', () => {
+            state.isLightMode = !state.isLightMode;
+            if (state.isLightMode) {
+                document.body.classList.add('light-mode');
+            } else {
+                document.body.classList.remove('light-mode');
+            }
+            draw();
+        });
+
         document.getElementById('btn-toggle-grid').addEventListener('click', () => {
             state.showGrid = !state.showGrid;
             draw();
