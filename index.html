@@ -272,6 +272,13 @@
                         </div>
                         <input type="range" id="sld-global-y" min="-100" max="100" step="0.1">
                     </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs text-gray-400">Global Pitch (mrad)</label>
+                            <input type="number" id="num-global-pitch" class="num-input text-teal-400" min="-100" max="100" step="0.1">
+                        </div>
+                        <input type="range" id="sld-global-pitch" min="-100" max="100" step="0.1">
+                    </div>
                 </div>
             </div>
 
@@ -569,7 +576,7 @@
             rectRotation: 10.0,
             rayAngleOffset: 0.0,
             autoRayOffset: true,
-            globalX: 0.0, globalY: 0.0,
+            globalX: 0.0, globalY: 0.0, globalPitch: 0.0,
             c1Len: 40, c2Len: 120, thickness: 20,
             c1X: 0, c1Y: 0,
             c2X: 0, c2Y: 10,
@@ -596,6 +603,7 @@
             { id: 'ray-angle-offset', key: 'rayAngleOffset' },
             { id: 'global-x', key: 'globalX' },
             { id: 'global-y', key: 'globalY' },
+            { id: 'global-pitch', key: 'globalPitch' },
             { id: 'c1-len', key: 'c1Len' },
             { id: 'c2-len', key: 'c2Len' },
             { id: 'thickness', key: 'thickness' },
@@ -612,9 +620,10 @@
 
         // --- Physics Calculations ---
         function calculatePhysics() {
-            // True Bragg Angle = Goniometer Angle - Ray Angle Offset
+            // True Bragg Angle = Goniometer Angle + Global Pitch - Ray Angle Offset
             const rayAngleOffsetDeg = (state.rayAngleOffset / 1000) * (180 / Math.PI);
-            const trueBraggDeg = state.rectRotation - rayAngleOffsetDeg;
+            const globalPitchDeg = (state.globalPitch / 1000) * (180 / Math.PI);
+            const trueBraggDeg = state.rectRotation + globalPitchDeg - rayAngleOffsetDeg;
             const thetaRad = trueBraggDeg * Math.PI / 180;
             const lambda = 2 * state.dSpacing * Math.sin(thetaRad);
             
@@ -664,9 +673,10 @@
             const thetaRad = Math.asin(sinTheta);
             const trueBraggDeg = thetaRad * 180 / Math.PI;
             const rayAngleOffsetDeg = (state.rayAngleOffset / 1000) * (180 / Math.PI);
+            const globalPitchDeg = (state.globalPitch / 1000) * (180 / Math.PI);
             
-            // Goniometer angle needs to compensate for the ray angle offset
-            state.rectRotation = trueBraggDeg + rayAngleOffsetDeg;
+            // Goniometer angle needs to compensate for the ray angle offset and global pitch
+            state.rectRotation = trueBraggDeg + rayAngleOffsetDeg - globalPitchDeg;
             
             // Sync UI angle sliders
             document.getElementById('num-rect-angle').value = state.rectRotation.toFixed(3);
@@ -900,7 +910,8 @@
             if (state.autoGap) {
                 // Calculate True Bragg Angle for the gap geometry
                 const rayAngleOffsetDeg = (state.rayAngleOffset / 1000) * (180 / Math.PI);
-                const trueBraggDeg = state.rectRotation - rayAngleOffsetDeg;
+                const globalPitchDeg = (state.globalPitch / 1000) * (180 / Math.PI);
+                const trueBraggDeg = state.rectRotation + globalPitchDeg - rayAngleOffsetDeg;
                 const thetaRad = trueBraggDeg * Math.PI / 180;
                 const cosTheta = Math.cos(thetaRad);
                 
@@ -930,8 +941,9 @@
             crystals[1].y = state.c2Y + state.globalY;
             crystals[1].rotation_center = [state.globalX, state.globalY];
             
-            crystals[0].applyGlobalRotation(state.rectRotation);
-            crystals[1].applyGlobalRotation(state.rectRotation + (state.c2Pitch / 1000000) * (180 / Math.PI));
+            const globalPitchDeg = (state.globalPitch / 1000) * (180 / Math.PI);
+            crystals[0].applyGlobalRotation(state.rectRotation + globalPitchDeg);
+            crystals[1].applyGlobalRotation(state.rectRotation + globalPitchDeg + (state.c2Pitch / 1000000) * (180 / Math.PI));
 
             if (document.getElementById('lcd-rect-angle')) {
                 document.getElementById('lcd-rect-angle').textContent = state.rectRotation.toFixed(3) + '°';
