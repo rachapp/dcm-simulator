@@ -121,9 +121,9 @@
                     <div class="pt-2 border-t border-blue-500/20">
                         <div class="flex justify-between items-center mb-1">
                             <label class="text-xs font-semibold text-yellow-400">Energy (keV)</label>
-                            <input type="number" id="num-energy" class="num-input font-bold text-yellow-400" min="1" max="50" step="0.1">
+                            <input type="number" id="num-energy" class="num-input font-bold text-yellow-400" min="1" max="80" step="0.1">
                         </div>
-                        <input type="range" id="sld-energy" min="1" max="50" step="0.1">
+                        <input type="range" id="sld-energy" min="1" max="80" step="0.1">
                         <div class="flex justify-between items-center mt-2">
                             <label class="text-xs text-gray-400">Wavelength (Å)</label>
                             <span id="lbl-wavelength" class="text-xs font-mono text-gray-300">--</span>
@@ -230,23 +230,23 @@
                     <div>
                         <div class="flex justify-between items-center mb-1">
                             <label class="text-xs text-gray-400">C1 Length (mm)</label>
-                            <input type="number" id="num-c1-len" class="num-input text-pink-400" min="5" max="100" step="1">
+                            <input type="number" id="num-c1-len" class="num-input text-pink-400" min="5" max="1000" step="1">
                         </div>
-                        <input type="range" id="sld-c1-len" min="5" max="100" step="1">
+                        <input type="range" id="sld-c1-len" min="5" max="1000" step="1">
                     </div>
                     <div>
                         <div class="flex justify-between items-center mb-1">
                             <label class="text-xs text-gray-400">C2 Length (mm)</label>
-                            <input type="number" id="num-c2-len" class="num-input text-pink-400" min="10" max="250" step="1">
+                            <input type="number" id="num-c2-len" class="num-input text-pink-400" min="10" max="1000" step="1">
                         </div>
-                        <input type="range" id="sld-c2-len" min="10" max="250" step="1">
+                        <input type="range" id="sld-c2-len" min="10" max="1000" step="1">
                     </div>
                     <div>
                         <div class="flex justify-between items-center mb-1">
                             <label class="text-xs text-gray-400">Thickness (mm)</label>
-                            <input type="number" id="num-thickness" class="num-input text-pink-400" min="1" max="50" step="1">
+                            <input type="number" id="num-thickness" class="num-input text-pink-400" min="1" max="1000" step="1">
                         </div>
-                        <input type="range" id="sld-thickness" min="1" max="50" step="1">
+                        <input type="range" id="sld-thickness" min="1" max="1000" step="1">
                     </div>
                 </div>
             </div>
@@ -292,16 +292,16 @@
                     <div>
                         <div class="flex justify-between items-center mb-1">
                             <label class="text-xs text-gray-400">Local C1 X (mm)</label>
-                            <input type="number" id="num-c1-x" class="num-input text-orange-400" min="-100" max="100" step="0.1">
+                            <input type="number" id="num-c1-x" class="num-input text-orange-400" min="-1000" max="1000" step="0.1">
                         </div>
-                        <input type="range" id="sld-c1-x" min="-100" max="100" step="0.1">
+                        <input type="range" id="sld-c1-x" min="-1000" max="1000" step="0.1">
                     </div>
                     <div>
                         <div class="flex justify-between items-center mb-1">
                             <label class="text-xs text-gray-400">Local C1 Y (mm)</label>
-                            <input type="number" id="num-c1-y" class="num-input text-orange-400" min="-100" max="100" step="0.1">
+                            <input type="number" id="num-c1-y" class="num-input text-orange-400" min="-1000" max="1000" step="0.1">
                         </div>
-                        <input type="range" id="sld-c1-y" min="-100" max="100" step="0.1">
+                        <input type="range" id="sld-c1-y" min="-1000" max="1000" step="0.1">
                     </div>
                 </div>
             </div>
@@ -316,9 +316,9 @@
                     <div>
                         <div class="flex justify-between items-center mb-1">
                             <label class="text-xs text-gray-400">Horizontal Shift X (mm)</label>
-                            <input type="number" id="num-c2-x" class="num-input text-purple-400" min="-50" max="200" step="0.1">
+                            <input type="number" id="num-c2-x" class="num-input text-purple-400" min="-1000" max="1000" step="0.1">
                         </div>
-                        <input type="range" id="sld-c2-x" min="-50" max="200" step="0.1">
+                        <input type="range" id="sld-c2-x" min="-1000" max="1000" step="0.1">
                     </div>
                     <div class="pt-2 border-t border-gray-700/50">
                         <div class="flex justify-between items-center mb-1">
@@ -326,18 +326,18 @@
                                 Vertical Gap Y (mm)
                                 <button id="btn-auto-gap" class="ml-2 text-[10px] px-2 py-0.5 rounded border border-gray-600 bg-gray-800 text-gray-400 hover:text-white transition-colors focus:outline-none">Auto: OFF</button>
                             </label>
-                            <input type="number" id="num-c2-y" class="num-input text-purple-400" min="-50" max="100" step="0.1">
+                            <input type="number" id="num-c2-y" class="num-input text-purple-400" min="-1000" max="1000" step="0.1">
                         </div>
-                        <input type="range" id="sld-c2-y" min="-50" max="100" step="0.1">
+                        <input type="range" id="sld-c2-y" min="-1000" max="1000" step="0.1">
                     </div>
 
                     <!-- Fixed Offset H for Auto Calculation -->
                     <div id="container-offset-h" class="hidden bg-indigo-900/20 p-2 rounded border border-indigo-500/30">
                         <div class="flex justify-between items-center mb-1">
                             <label class="text-xs text-indigo-300">Fixed Offset <i class="font-serif">h</i> (mm)</label>
-                            <input type="number" id="num-offset-h" class="num-input text-indigo-400" min="0" max="100" step="0.1">
+                            <input type="number" id="num-offset-h" class="num-input text-indigo-400" min="0" max="1000" step="0.1">
                         </div>
-                        <input type="range" id="sld-offset-h" min="0" max="100" step="0.1">
+                        <input type="range" id="sld-offset-h" min="0" max="1000" step="0.1">
                     </div>
                     <div>
                         <div class="flex justify-between items-center mb-1">
