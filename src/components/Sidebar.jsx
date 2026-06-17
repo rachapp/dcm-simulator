@@ -3,12 +3,7 @@ import { Settings, Zap, RotateCw, Move, Maximize, Layers, Sliders, Info } from '
 import ControlSection from './ControlSection';
 import ControlItem from './ControlItem';
 import { PRESETS } from '../engine';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-function cn(...inputs) {
-  return twMerge(clsx(inputs));
-}
+import { cn } from '../utils';
 
 const Sidebar = ({ state, setState, updateState, energy, handleEnergyChange, physics, snapToPivot }) => {
   return (
@@ -254,7 +249,7 @@ const Sidebar = ({ state, setState, updateState, energy, handleEnergyChange, phy
             isLightMode={state.isLightMode}
           />
           <ControlItem 
-            label="Thickness" 
+            label="C1 & C2 Thickness" 
             unit="mm"
             value={state.thickness}
             min={1} 
@@ -341,7 +336,7 @@ const Sidebar = ({ state, setState, updateState, energy, handleEnergyChange, phy
           className={state.rotationCenterMode === 'C1' ? "border-green-500/20 bg-green-900/5" : ""}
         >
           <ControlItem 
-            label="Local C1 X" 
+            label="Horizontal (X)" 
             unit="mm"
             value={state.c1X}
             min={-1000} 
@@ -354,7 +349,7 @@ const Sidebar = ({ state, setState, updateState, energy, handleEnergyChange, phy
           
           {state.rotationCenterMode === 'C1' ? (
             <ControlItem 
-              label="Local C1 Y" 
+              label="Vertical (Y)" 
               unit="mm"
               value={state.c1Y}
               min={-1000} 
@@ -368,7 +363,7 @@ const Sidebar = ({ state, setState, updateState, energy, handleEnergyChange, phy
             <div className={cn("pt-2 border-t", state.isLightMode ? "border-gray-200" : "border-gray-700/50")}>
               <div className="flex justify-between items-center mb-1">
                 <label className="text-xs text-gray-400 flex items-center">
-                  Vertical Gap Y (mm)
+                  Crystal Gap (Y)
                   <button 
                     onClick={() => updateState('autoGap', !state.autoGap)}
                     className={cn(
@@ -384,13 +379,14 @@ const Sidebar = ({ state, setState, updateState, energy, handleEnergyChange, phy
               </div>
               <ControlItem 
                 label=""
+                unit="mm"
                 value={state.c1Y}
                 min={-1000} 
                 max={1000} 
                 step={0.1}
                 disabled={state.autoGap}
                 onChange={(v) => updateState('c1Y', v)}
-                valueClassName="text-purple-600"
+                valueClassName="text-orange-600"
                 isLightMode={state.isLightMode}
               />
               {state.autoGap && (
@@ -399,7 +395,7 @@ const Sidebar = ({ state, setState, updateState, energy, handleEnergyChange, phy
                   state.isLightMode ? "bg-indigo-50 border-indigo-200" : "bg-indigo-900/20 border-indigo-500/30"
                 )}>
                   <ControlItem 
-                    label="Fixed Offset h" 
+                    label="Fixed Beam Offset h" 
                     unit="mm"
                     value={state.offsetH}
                     min={0} 
@@ -422,21 +418,146 @@ const Sidebar = ({ state, setState, updateState, energy, handleEnergyChange, phy
           isLightMode={state.isLightMode}
           className={state.rotationCenterMode === 'C2' ? "border-green-500/20 bg-green-900/5" : ""}
         >
-          <ControlItem 
-            label="Horizontal Shift X" 
-            unit="mm"
-            value={state.c2X}
-            min={-1000} 
-            max={1000} 
-            step={0.1}
-            onChange={(v) => updateState('c2X', v)}
-            valueClassName="text-purple-600"
-            isLightMode={state.isLightMode}
-          />
+          {/* ── Horizontal (X) with Auto mode ── */}
+          <div>
+            <div className="flex justify-between items-center mb-1">
+              <label className="text-xs text-gray-400 flex items-center">
+                Horizontal (X)
+                <button
+                  onClick={() => updateState('autoC2X', !state.autoC2X)}
+                  className={cn(
+                    "ml-2 text-[10px] px-2 py-0.5 rounded border transition-colors focus:outline-none",
+                    state.autoC2X
+                      ? "border-violet-500 bg-violet-900/50 text-violet-300"
+                      : (state.isLightMode ? "border-gray-300 bg-gray-100 text-gray-600" : "border-gray-600 bg-gray-800 text-gray-400 hover:text-white")
+                  )}
+                >
+                  Auto: {state.autoC2X ? "ON" : "OFF"}
+                </button>
+              </label>
+            </div>
+
+            <ControlItem
+              label=""
+              unit="mm"
+              value={state.c2X}
+              min={state.autoC2X ? state.c2XMin : -1000}
+              max={state.autoC2X ? state.c2XMax : 1000}
+              step={0.1}
+              disabled={state.autoC2X}
+              onChange={(v) => updateState('c2X', v)}
+              valueClassName="text-purple-600"
+              isLightMode={state.isLightMode}
+            />
+
+            {/* Range limits panel — shown only when auto is ON */}
+            {state.autoC2X && (
+              <div className={cn(
+                "mt-2 p-3 rounded-lg border space-y-3",
+                state.isLightMode
+                  ? "bg-violet-50 border-violet-200"
+                  : "bg-violet-900/20 border-violet-500/30"
+              )}>
+                {/* Formula hint + live value + clamp warning */}
+                <div className={cn(
+                  "text-[10px] font-mono px-2 py-1.5 rounded space-y-0.5",
+                  state.isLightMode ? "bg-violet-100 text-violet-700" : "bg-violet-950/60 text-violet-300"
+                )}>
+                  <div className="flex justify-between items-center">
+                    <span>X = (Gap − 2·C1Y)/tan θ − Y_gl/sin θ</span>
+                    {(() => {
+                      const thetaRad = (
+                        state.rectRotation
+                        + (state.globalPitch    / 1000) * (180 / Math.PI)
+                        - (state.rayAngleOffset / 1000) * (180 / Math.PI)
+                      ) * Math.PI / 180;
+                      const tanT = Math.tan(thetaRad);
+                      if (Math.abs(tanT) < 0.001) return null;
+                      const raw = (state.c2Y - 2 * state.c1Y) / tanT - state.globalY / Math.sin(thetaRad);
+                      const isClamped = raw < state.c2XMin || raw > state.c2XMax;
+                      return isClamped ? (
+                        <span className="text-amber-400 font-sans">&#9888; clamped</span>
+                      ) : null;
+                    })()}
+                  </div>
+                  {/* Show the live unclamped value */}
+                  {(() => {
+                    const thetaRad = (
+                      state.rectRotation
+                      + (state.globalPitch    / 1000) * (180 / Math.PI)
+                      - (state.rayAngleOffset / 1000) * (180 / Math.PI)
+                    ) * Math.PI / 180;
+                    const tanT = Math.tan(thetaRad);
+                    if (Math.abs(tanT) < 0.001) return null;
+                    const raw = (state.c2Y - 2 * state.c1Y) / tanT - state.globalY / Math.sin(thetaRad);
+                    return (
+                      <div className={cn(
+                        "text-[9px] opacity-70",
+                        state.isLightMode ? "text-violet-600" : "text-violet-400"
+                      )}>
+                        ideal = {raw.toFixed(2)} mm{raw < state.c2XMin || raw > state.c2XMax ? ` (range: ${state.c2XMin}–${state.c2XMax})` : ''}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Physical stage range inputs */}
+                <div>
+                  <div className={cn(
+                    "text-[10px] uppercase tracking-wider mb-2",
+                    state.isLightMode ? "text-violet-600" : "text-violet-400"
+                  )}>
+                    Physical Stage Range
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <div className="text-[10px] text-gray-500 mb-1">Min (mm)</div>
+                      <input
+                        type="number"
+                        step="any"
+                        aria-label="C2 horizontal stage minimum"
+                        className={cn(
+                          "w-full border rounded px-2 py-1 text-xs font-mono text-right outline-none focus:border-violet-500",
+                          state.isLightMode
+                            ? "bg-white border-gray-300 text-violet-700"
+                            : "bg-gray-950 border-gray-700 text-violet-300"
+                        )}
+                        value={state.c2XMin}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          if (!isNaN(val)) updateState('c2XMin', val);
+                        }}
+                      />
+                    </div>
+                    <span className="text-gray-500 text-xs mt-4">→</span>
+                    <div className="flex-1">
+                      <div className="text-[10px] text-gray-500 mb-1">Max (mm)</div>
+                      <input
+                        type="number"
+                        step="any"
+                        aria-label="C2 horizontal stage maximum"
+                        className={cn(
+                          "w-full border rounded px-2 py-1 text-xs font-mono text-right outline-none focus:border-violet-500",
+                          state.isLightMode
+                            ? "bg-white border-gray-300 text-violet-700"
+                            : "bg-gray-950 border-gray-700 text-violet-300"
+                        )}
+                        value={state.c2XMax}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          if (!isNaN(val)) updateState('c2XMax', val);
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
           {state.rotationCenterMode === 'C2' ? (
              <ControlItem 
-              label="Local C2 Y" 
+              label="Vertical (Y)" 
               unit="mm"
               value={state.c2Y}
               min={-1000} 
@@ -450,7 +571,7 @@ const Sidebar = ({ state, setState, updateState, energy, handleEnergyChange, phy
             <div className={cn("pt-2 border-t", state.isLightMode ? "border-gray-200" : "border-gray-700/50")}>
               <div className="flex justify-between items-center mb-1">
                 <label className="text-xs text-gray-400 flex items-center">
-                  Vertical Gap Y (mm)
+                  Crystal Gap (Y)
                   <button 
                     onClick={() => updateState('autoGap', !state.autoGap)}
                     className={cn(
@@ -466,6 +587,7 @@ const Sidebar = ({ state, setState, updateState, energy, handleEnergyChange, phy
               </div>
               <ControlItem 
                 label=""
+                unit="mm"
                 value={state.c2Y}
                 min={-1000} 
                 max={1000} 
@@ -481,7 +603,7 @@ const Sidebar = ({ state, setState, updateState, energy, handleEnergyChange, phy
                   state.isLightMode ? "bg-indigo-50 border-indigo-200" : "bg-indigo-900/20 border-indigo-500/30"
                 )}>
                   <ControlItem 
-                    label="Fixed Offset h" 
+                    label="Fixed Beam Offset h" 
                     unit="mm"
                     value={state.offsetH}
                     min={0} 
@@ -497,7 +619,7 @@ const Sidebar = ({ state, setState, updateState, energy, handleEnergyChange, phy
           )}
 
           <ControlItem 
-            label="Pitch Detune" 
+            label="Pitch" 
             unit="µrad"
             value={state.c2Pitch}
             min={-500} 

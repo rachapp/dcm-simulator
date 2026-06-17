@@ -1,10 +1,5 @@
 import React from 'react';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-function cn(...inputs) {
-  return twMerge(clsx(inputs));
-}
+import { cn } from '../utils';
 
 const ControlItem = ({ 
   label, 
@@ -73,12 +68,14 @@ const ControlItem = ({
           onBlur={handleBlur}
         />
       </div>
-      <input 
-        type="range" 
-        step={step} 
-        min={min} 
-        max={max} 
+      {/* I4: aria-label for screen-reader accessibility */}
+      <input
+        type="range"
+        step={step}
+        min={min}
+        max={max}
         disabled={disabled}
+        aria-label={label || 'slider'}
         className={cn(
           "w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400 transition-all",
           disabled && "cursor-not-allowed"
