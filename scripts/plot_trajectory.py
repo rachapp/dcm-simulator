@@ -2,38 +2,42 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Default physical configuration
-h = 20.0          # beam offset in mm
-theta_min = 5.0   # Bragg angle scan start (degrees)
-theta_max = 50.0  # Bragg angle scan end (degrees)
-N = 1000          # number of samples
+# Physical configuration for C2-rotation center system
+h = 20.0             # beam offset in mm
+d_Si111 = 3.1356     # Si 111 d-spacing in Angstroms
+HC = 12.3984193      # Planck's constant * c in keV*A
 
-# Theta array
-theta_deg = np.linspace(theta_min, theta_max, N)
+# Scan configuration (100 points)
+N_points = 100
+sample_index = np.arange(1, N_points + 1)
+
+# Bragg angle scan: linear in theta from 5 to 50 degrees
+theta_deg = 5.0 + (sample_index - 1) * (50.0 - 5.0) / (N_points - 1)
 theta_rad = np.radians(theta_deg)
 
-# 1. Motorized Stage Position Trajectories
-# Horizontal translation (C2X): X(theta) = h / (2 * sin(theta))
-c2X = h / (2 * np.sin(theta_rad))
-# Vertical Gap (g): g(theta) = h / (2 * cos(theta))
-g = h / (2 * np.cos(theta_rad))
+# Motorized Stage Calculations (C2 Center of Rotation):
+# 1. stage_z (vertical gap g): g(theta) = h / (2 * cos(theta))
+stage_z = h / (2 * np.cos(theta_rad))
 
-# 2. Motorized Stage Velocity Trajectories (derivatives w.r.t theta in degrees)
-# dx/dtheta = -h * cos(theta) / (2 * sin^2(theta)) * (pi / 180)
-# dg/dtheta = h * sin(theta) / (2 * cos^2(theta)) * (pi / 180)
-deg_to_rad = np.pi / 180.0
-v_c2X = -h * np.cos(theta_rad) / (2 * np.sin(theta_rad)**2) * deg_to_rad
-v_g = h * np.sin(theta_rad) / (2 * np.cos(theta_rad)**2) * deg_to_rad
+# 2. stage_y (C1 vertical position): under C2 pivot mode, C2 is fixed at output axis (y=h),
+#    C1 vertical stage moves C1 down relative to C2: stage_y = -gap
+stage_y = -stage_z
 
-# Create output scripts folder if it doesn't exist
+# 3. stage_x (C2 horizontal position - for completeness in CSV): X = h / (2 * sin(theta))
+stage_x = h / (2 * np.sin(theta_rad))
+
+# 4. Calculated energy for Si 111 lattice plane: E = HC / (2 * d * sin(theta))
+calculated_energy = HC / (2 * d_Si111 * np.sin(theta_rad))
+
+# Create output folder if it doesn't exist
 os.makedirs('scripts', exist_ok=True)
 
-# Export generated trajectory data to CSV for external plotting (e.g. Origin/Excel)
-data = np.column_stack((theta_deg, c2X, g, v_c2X, v_g))
-header = "theta_deg,c2X_position_mm,gap_position_mm,c2X_velocity_mm_per_deg,gap_velocity_mm_per_deg"
+# Export generated trajectory data to CSV for manuscript table reference
+data = np.column_stack((sample_index, theta_deg, stage_y, stage_z, stage_x, calculated_energy))
+header = "N,theta_deg,stage_y_C1_vertical_mm,stage_z_gap_mm,stage_x_C2_horizontal_mm,calculated_energy_Si111_keV"
 np.savetxt('scripts/trajectory_data.csv', data, delimiter=',', header=header, comments='')
 
-# Professional Matplotlib configuration for manuscript-ready quality
+# Matplotlib settings for publication-ready manuscript styling
 plt.rcParams.update({
     'font.family': 'serif',
     'font.size': 10,
@@ -49,47 +53,47 @@ plt.rcParams.update({
     'savefig.bbox': 'tight'
 })
 
-# Create 2x2 figure layout
-fig, axs = plt.subplots(2, 2, figsize=(7.0, 5.5), sharex=True)
+# Create 2x2 grid layout (theta vs N, energy vs N, stage_y vs N, stage_z vs N)
+fig, axs = plt.subplots(2, 2, figsize=(7.5, 6.0), sharex=True)
 
-# Plot Horizontal Position
-axs[0, 0].plot(theta_deg, c2X, color='#1d4ed8', linewidth=1.8, label=r'$X(\theta)$')
-axs[0, 0].set_ylabel('Position $X$ (mm)')
-axs[0, 0].set_title('C2 Horizontal Axis ($X$)')
+# Subplot 1: Theta vs N
+axs[0, 0].plot(sample_index, theta_deg, color='#1d4ed8', linewidth=2, label=r'$\theta$')
+axs[0, 0].set_ylabel('Bragg Angle $\theta$ (deg)')
+axs[0, 0].set_title('Bragg Angle vs Sample Index')
 axs[0, 0].grid(True)
-axs[0, 0].legend(loc='upper right')
+axs[0, 0].legend(loc='upper left')
 
-# Plot Horizontal Velocity
-axs[0, 1].plot(theta_deg, v_c2X, color='#b91c1c', linewidth=1.8, label=r'$dX/d\theta$')
-axs[0, 1].set_ylabel('Velocity $dX/d\theta$ (mm/deg)')
-axs[0, 1].set_title('Horizontal Axis Velocity')
+# Subplot 2: Calculated Energy vs N
+axs[0, 1].plot(sample_index, calculated_energy, color='#b91c1c', linewidth=2, label=r'$E$ (Si 111)')
+axs[0, 1].set_ylabel('Energy $E$ (keV)')
+axs[0, 1].set_title('Calculated Energy (Si 111)')
 axs[0, 1].grid(True)
-axs[0, 1].legend(loc='lower right')
+axs[0, 1].legend(loc='upper right')
 
-# Plot Vertical Gap Position
-axs[1, 0].plot(theta_deg, g, color='#047857', linewidth=1.8, label=r'$g(\theta)$')
-axs[1, 0].set_xlabel('Bragg Angle $\theta$ (deg)')
-axs[1, 0].set_ylabel('Vertical Gap $g$ (mm)')
-axs[1, 0].set_title('C2 Vertical Gap Axis ($g$)')
+# Subplot 3: Stage Y vs N (C1 Vertical)
+axs[1, 0].plot(sample_index, stage_y, color='#047857', linewidth=2, label=r'$stage\_y$')
+axs[1, 0].set_xlabel('Sample Index ($N$)')
+axs[1, 0].set_ylabel('C1 Vertical Stage $Y$ (mm)')
+axs[1, 0].set_title(r'C1 Vertical position ($stage\_y$)')
 axs[1, 0].grid(True)
-axs[1, 0].legend(loc='upper left')
+axs[1, 0].legend(loc='lower left')
 
-# Plot Vertical Gap Velocity
-axs[1, 1].plot(theta_deg, v_g, color='#6d28d9', linewidth=1.8, label=r'$dg/d\theta$')
-axs[1, 1].set_xlabel('Bragg Angle $\theta$ (deg)')
-axs[1, 1].set_ylabel('Velocity $dg/d\theta$ (mm/deg)')
-axs[1, 1].set_title('Vertical Gap Axis Velocity')
+# Subplot 4: Stage Z vs N (Gap)
+axs[1, 1].plot(sample_index, stage_z, color='#6d28d9', linewidth=2, label=r'$stage\_z$')
+axs[1, 1].set_xlabel('Sample Index ($N$)')
+axs[1, 1].set_ylabel('Vertical Gap Stage $Z$ (mm)')
+axs[1, 1].set_title(r'Vertical Gap Stage ($stage\_z$)')
 axs[1, 1].grid(True)
 axs[1, 1].legend(loc='upper left')
 
-# Adjust layout to prevent label overlaps
+# Adjust subplots spacing
 plt.tight_layout()
 
-# Save as publication-ready high-resolution formats
+# Save high-resolution figures
 plt.savefig('scripts/trajectory_plot.png')
 plt.savefig('scripts/trajectory_plot.pdf')
 
-print("Successfully generated:")
+print("Successfully regenerated:")
 print("  - Data log: scripts/trajectory_data.csv")
 print("  - Figure (PNG): scripts/trajectory_plot.png")
 print("  - Figure (PDF): scripts/trajectory_plot.pdf")
