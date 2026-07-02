@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useCallback, useState } from 'react';
-import { ChevronLeft, ChevronRight, Sun, Moon, Grid, Download, Crosshair } from 'lucide-react';
+import React, { useEffect, useLayoutEffect, useRef, useCallback, useState } from 'react';
+import { ChevronLeft, ChevronRight, Sun, Moon, Grid, Download, Crosshair, GripHorizontal, Minimize2, Maximize2 } from 'lucide-react';
 import { cn } from '../utils';
 
 const SimulatorCanvas = ({
@@ -7,11 +7,39 @@ const SimulatorCanvas = ({
   updateState,
   crystals,
   rays,
-  readout
+  readout,
+  mirror
 }) => {
   const canvasRef    = useRef(null);
   const containerRef = useRef(null);
   const [viewSize, setViewSize] = useState({ width: 0, height: 0 });
+  const [controlsPos, setControlsPos] = useState({ x: 0, y: 0 });
+  const [controlsMinimized, setControlsMinimized] = useState(false);
+
+  const handleControlsDrag = (e) => {
+    if (e.button !== 0) return;
+    if (e.target.closest('button')) return;
+    e.preventDefault();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const initX = controlsPos.x;
+    const initY = controlsPos.y;
+
+    const onMouseMove = (moveEvent) => {
+      setControlsPos({
+        x: initX + (moveEvent.clientX - startX),
+        y: initY + (moveEvent.clientY - startY)
+      });
+    };
+
+    const onMouseUp = () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
 
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
 
@@ -140,25 +168,60 @@ const SimulatorCanvas = ({
       ctx.stroke();
     }
 
-    // Rays
+    // Mirror
+    if (mirror) {
+      const pts = mirror.getCorners().map(p => toScreen(p[0], p[1]));
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < 4; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(249, 115, 22, 0.18)';
+      ctx.fill();
+      ctx.strokeStyle = '#f97316';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+
+    // Rays (split at mirror hit: forward = ray.color, return = orange)
+    const RETURN_COLOR = '#f97316';
     for (const ray of rays) {
+      const mirrorIdx = mirror
+        ? ray.hitObjects.findIndex((r, i) => i > 0 && r === mirror)
+        : -1;
+      const splitAt = mirrorIdx > 0 ? mirrorIdx : ray.path.length - 1;
+
+      // Forward path
       ctx.beginPath();
       const p0 = toScreen(ray.path[0][0], ray.path[0][1]);
       ctx.moveTo(p0[0], p0[1]);
-      for (let i = 1; i < ray.path.length; i++) {
+      for (let i = 1; i <= splitAt; i++) {
         const p = toScreen(ray.path[i][0], ray.path[i][1]);
         ctx.lineTo(p[0], p[1]);
       }
       ctx.strokeStyle = ray.color;
       ctx.lineWidth = 1;
       ctx.stroke();
+
+      // Return path (orange), only when mirror was hit
+      if (mirrorIdx > 0 && mirrorIdx < ray.path.length - 1) {
+        ctx.beginPath();
+        const pm = toScreen(ray.path[mirrorIdx][0], ray.path[mirrorIdx][1]);
+        ctx.moveTo(pm[0], pm[1]);
+        for (let i = mirrorIdx + 1; i < ray.path.length; i++) {
+          const p = toScreen(ray.path[i][0], ray.path[i][1]);
+          ctx.lineTo(p[0], p[1]);
+        }
+        ctx.strokeStyle = RETURN_COLOR;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
     }
 
     ctx.restore();
   // FIX B3: include readout in dependency array so pivot marker always redraws
-  }, [viewSize, state, crystals, rays, readout, dpr]);
+  }, [viewSize, state, crystals, rays, readout, mirror, dpr]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     draw();
   }, [draw]);
 
@@ -237,7 +300,7 @@ const SimulatorCanvas = ({
       viewCenterX: localPan.current.x,
       viewCenterY: localPan.current.y,
     };
-    drawWithState(overriddenState, canvas, viewSize, crystals, rays, readout);
+    drawWithState(overriddenState, canvas, viewSize, crystals, rays, readout, mirror);
   };
 
   const handleMouseUp = () => {
@@ -334,11 +397,30 @@ const SimulatorCanvas = ({
       svgContent.push(`<line x1="${rp[0] + 4}" y1="${rp[1] - 4}" x2="${rp[0] - 4}" y2="${rp[1] + 4}" stroke="#eab308" stroke-width="2" />`);
     }
 
-    // Rays
-    for (const ray of rays) {
-      const pts = ray.path.map(p => toScreen(p[0], p[1]));
+    // Mirror
+    if (mirror) {
+      const pts = mirror.getCorners().map(p => toScreen(p[0], p[1]));
       const pointsStr = pts.map(p => p.join(',')).join(' ');
-      svgContent.push(`<polyline points="${pointsStr}" stroke="${ray.color}" stroke-width="1" fill="none" />`);
+      svgContent.push(`<polygon points="${pointsStr}" stroke="#f97316" stroke-width="3" fill="rgba(249,115,22,0.18)" />`);
+    }
+
+    // Rays (split at mirror hit for color)
+    const SVG_RETURN_COLOR = '#f97316';
+    for (const ray of rays) {
+      const mirrorIdx = mirror
+        ? ray.hitObjects.findIndex((r, i) => i > 0 && r === mirror)
+        : -1;
+      const splitAt = mirrorIdx > 0 ? mirrorIdx : ray.path.length - 1;
+
+      // Forward path
+      const fwdPts = ray.path.slice(0, splitAt + 1).map(p => toScreen(p[0], p[1]));
+      svgContent.push(`<polyline points="${fwdPts.map(p => p.join(',')).join(' ')}" stroke="${ray.color}" stroke-width="1" fill="none" />`);
+
+      // Return path
+      if (mirrorIdx > 0 && mirrorIdx < ray.path.length - 1) {
+        const retPts = ray.path.slice(mirrorIdx).map(p => toScreen(p[0], p[1]));
+        svgContent.push(`<polyline points="${retPts.map(p => p.join(',')).join(' ')}" stroke="${SVG_RETURN_COLOR}" stroke-width="1" fill="none" />`);
+      }
     }
 
     // Origin marker (Pivot Point)
@@ -348,7 +430,7 @@ const SimulatorCanvas = ({
     svgContent.push(`<circle cx="${cp[0]}" cy="${cp[1]}" r="3" fill="#eab308" />`);
 
     return `<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n  ${svgContent.join('\n  ')}\n</svg>`;
-  }, [viewSize, state, crystals, rays, readout]);
+  }, [viewSize, state, crystals, rays, readout, mirror]);
 
   const handleExportSVG = () => {
     const svgString = generateSVGString();
@@ -381,53 +463,110 @@ const SimulatorCanvas = ({
         )}
       />
 
-      {/* Floating Controls */}
-      <div className="absolute top-6 left-6 flex gap-2">
-        <button
-          onClick={() => updateState('uiVisible', !state.uiVisible)}
-          className="bg-gray-900/80 hover:bg-gray-800 text-gray-300 px-3 py-1.5 rounded border border-gray-700 shadow-xl backdrop-blur-sm transition-all text-xs font-semibold tracking-wide flex items-center"
-          title="Toggle UI"
+      {/* Floating Controls - Dragable & Minimisable */}
+      <div
+        style={{
+          transform: `translate(${controlsPos.x}px, ${controlsPos.y}px)`,
+        }}
+        className={cn(
+          "absolute top-6 left-6 flex items-center shadow-2xl rounded-lg p-1.5 border backdrop-blur-sm transition-colors duration-300 z-30 pointer-events-auto select-none",
+          state.isLightMode ? "bg-white/95 border-gray-200 text-gray-800" : "bg-zinc-900/95 border-zinc-800 text-gray-200"
+        )}
+      >
+        {/* Drag Handle */}
+        <div
+          onMouseDown={handleControlsDrag}
+          onDoubleClick={() => setControlsPos({ x: 0, y: 0 })}
+          className="flex items-center gap-1.5 px-2 py-1 cursor-move rounded hover:bg-gray-500/10 active:bg-gray-500/20 mr-1"
+          title="Drag to move. Double-click to reset position."
         >
-          {state.uiVisible ? <ChevronLeft size={14} className="mr-1.5" /> : <ChevronRight size={14} className="mr-1.5" />}
-          UI
-        </button>
-        <button
-          onClick={() => updateState('isLightMode', !state.isLightMode)}
-          className="bg-gray-900/80 hover:bg-gray-800 text-gray-300 px-3 py-1.5 rounded border border-gray-700 shadow-xl backdrop-blur-sm transition-all text-xs font-semibold tracking-wide flex items-center"
-          title="Toggle Theme"
-        >
-          {state.isLightMode ? <Moon size={14} className="mr-1.5" /> : <Sun size={14} className="mr-1.5" />}
-          Day/Night
-        </button>
-        <button
-          onClick={() => updateState('showGrid', !state.showGrid)}
-          className={cn(
-            "px-3 py-1.5 rounded border shadow-xl backdrop-blur-sm transition-all text-xs font-semibold tracking-wide flex items-center",
-            state.showGrid ? "bg-blue-600 border-blue-400 text-white" : "bg-gray-900/80 border-gray-700 text-gray-300 hover:bg-gray-800"
+          <GripHorizontal className="w-3.5 h-3.5 opacity-60 text-emerald-500" />
+          {controlsMinimized && (
+            <span className="text-[10px] uppercase font-bold tracking-wide text-emerald-500 mr-1">Controls</span>
           )}
-          title="Toggle Grid"
-        >
-          <Grid size={14} className="mr-1.5" />
-          Grid
-        </button>
+        </div>
+
+        {/* Buttons List */}
+        {!controlsMinimized && (
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => updateState('uiVisible', !state.uiVisible)}
+              className={cn(
+                "px-2.5 py-1 rounded border transition-all text-xs font-semibold flex items-center cursor-pointer",
+                state.isLightMode 
+                  ? "bg-gray-100 hover:bg-gray-200 border-gray-300 text-gray-700" 
+                  : "bg-zinc-805 hover:bg-zinc-700 border-zinc-700 text-gray-200"
+              )}
+              title="Toggle Sidebar UI"
+            >
+              {state.uiVisible ? <ChevronLeft size={13} className="mr-1" /> : <ChevronRight size={13} className="mr-1" />}
+              UI
+            </button>
+            <button
+              onClick={() => updateState('isLightMode', !state.isLightMode)}
+              className={cn(
+                "px-2.5 py-1 rounded border transition-all text-xs font-semibold flex items-center cursor-pointer",
+                state.isLightMode 
+                  ? "bg-gray-100 hover:bg-gray-200 border-gray-300 text-gray-700" 
+                  : "bg-zinc-805 hover:bg-zinc-700 border-zinc-700 text-gray-200"
+              )}
+              title="Toggle Day/Night Theme"
+            >
+              {state.isLightMode ? <Moon size={13} className="mr-1" /> : <Sun size={13} className="mr-1" />}
+              Theme
+            </button>
+            <button
+              onClick={() => updateState('showGrid', !state.showGrid)}
+              className={cn(
+                "px-2.5 py-1 rounded border transition-all text-xs font-semibold flex items-center cursor-pointer",
+                state.showGrid 
+                  ? "bg-blue-600 border-blue-400 text-white" 
+                  : (state.isLightMode ? "bg-gray-100 hover:bg-gray-200 border-gray-300 text-gray-700" : "bg-zinc-805 hover:bg-zinc-700 border-zinc-700 text-gray-200")
+              )}
+              title="Toggle Background Grid"
+            >
+              <Grid size={13} className="mr-1" />
+              Grid
+            </button>
+            <button
+              onClick={() => updateState('showAxes', !state.showAxes)}
+              className={cn(
+                "px-2.5 py-1 rounded border transition-all text-xs font-semibold flex items-center cursor-pointer",
+                state.showAxes 
+                  ? "bg-blue-600 border-blue-400 text-white" 
+                  : (state.isLightMode ? "bg-gray-100 hover:bg-gray-200 border-gray-300 text-gray-700" : "bg-zinc-805 hover:bg-zinc-700 border-zinc-700 text-gray-200")
+              )}
+              title="Toggle Coordinate Axes"
+            >
+              <Crosshair size={13} className="mr-1" />
+              Axes
+            </button>
+            <button
+              onClick={handleExportSVG}
+              className={cn(
+                "px-2.5 py-1 rounded border transition-all text-xs font-semibold flex items-center cursor-pointer",
+                state.isLightMode 
+                  ? "bg-gray-100 hover:bg-gray-200 border-gray-300 text-gray-700" 
+                  : "bg-zinc-805 hover:bg-zinc-700 border-zinc-700 text-gray-200"
+              )}
+              title="Export Vector SVG Drawing"
+            >
+              <Download size={13} className="mr-1" />
+              Export SVG
+            </button>
+          </div>
+        )}
+
+        {/* Minimize Button */}
         <button
-          onClick={() => updateState('showAxes', !state.showAxes)}
+          onClick={() => setControlsMinimized(!controlsMinimized)}
           className={cn(
-            "px-3 py-1.5 rounded border shadow-xl backdrop-blur-sm transition-all text-xs font-semibold tracking-wide flex items-center",
-            state.showAxes ? "bg-blue-600 border-blue-400 text-white" : "bg-gray-900/80 border-gray-700 text-gray-300 hover:bg-gray-800"
+            "p-1 rounded ml-1 transition-colors cursor-pointer",
+            state.isLightMode ? "hover:bg-gray-250 text-gray-650" : "hover:bg-zinc-800 text-zinc-400"
           )}
-          title="Toggle Axes"
+          title={controlsMinimized ? "Expand Screen Controls" : "Minimize Screen Controls"}
         >
-          <Crosshair size={14} className="mr-1.5" />
-          Axes
-        </button>
-        <button
-          onClick={handleExportSVG}
-          className="bg-gray-900/80 hover:bg-gray-800 text-gray-300 px-3 py-1.5 rounded border border-gray-700 shadow-xl backdrop-blur-sm transition-all text-xs font-semibold tracking-wide flex items-center"
-          title="Export as Vector SVG"
-        >
-          <Download size={14} className="mr-1.5" />
-          Export SVG
+          {controlsMinimized ? <Maximize2 size={13} /> : <Minimize2 size={13} />}
         </button>
       </div>
     </div>
@@ -438,7 +577,7 @@ const SimulatorCanvas = ({
 // Standalone draw function used during mousemove panning so we can draw with
 // a temporary pan offset without triggering React state updates.
 // ---------------------------------------------------------------------------
-function drawWithState(state, canvas, viewSize, crystals, rays, readout) {
+function drawWithState(state, canvas, viewSize, crystals, rays, readout, mirror) {
   const ctx = canvas.getContext('2d');
   const { width, height } = viewSize;
   if (width === 0 || height === 0) return;
@@ -530,15 +669,50 @@ function drawWithState(state, canvas, viewSize, crystals, rays, readout) {
     ctx.strokeStyle = '#eab308'; ctx.lineWidth = 2; ctx.stroke();
   }
 
+  // Mirror
+  if (mirror) {
+    const pts = mirror.getCorners().map(p => toScreen(p[0], p[1]));
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < 4; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(249, 115, 22, 0.18)';
+    ctx.fill();
+    ctx.strokeStyle = '#f97316';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
+
+  const RETURN_COLOR = '#f97316';
   for (const ray of rays) {
+    const mirrorIdx = mirror
+      ? ray.hitObjects.findIndex((r, i) => i > 0 && r === mirror)
+      : -1;
+    const splitAt = mirrorIdx > 0 ? mirrorIdx : ray.path.length - 1;
+
     ctx.beginPath();
     const p0 = toScreen(ray.path[0][0], ray.path[0][1]);
     ctx.moveTo(p0[0], p0[1]);
-    for (let i = 1; i < ray.path.length; i++) {
+    for (let i = 1; i <= splitAt; i++) {
       const p = toScreen(ray.path[i][0], ray.path[i][1]);
       ctx.lineTo(p[0], p[1]);
     }
-    ctx.strokeStyle = ray.color; ctx.lineWidth = 1; ctx.stroke();
+    ctx.strokeStyle = ray.color;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    if (mirrorIdx > 0 && mirrorIdx < ray.path.length - 1) {
+      ctx.beginPath();
+      const pm = toScreen(ray.path[mirrorIdx][0], ray.path[mirrorIdx][1]);
+      ctx.moveTo(pm[0], pm[1]);
+      for (let i = mirrorIdx + 1; i < ray.path.length; i++) {
+        const p = toScreen(ray.path[i][0], ray.path[i][1]);
+        ctx.lineTo(p[0], p[1]);
+      }
+      ctx.strokeStyle = RETURN_COLOR;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
   }
 
   ctx.restore();

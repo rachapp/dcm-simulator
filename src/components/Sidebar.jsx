@@ -1,11 +1,22 @@
 import React from 'react';
-import { Settings, Zap, RotateCw, Move, Maximize, Layers, Sliders, Info } from 'lucide-react';
+import { Settings, Zap, RotateCw, Move, Maximize, Layers, Sliders, Info, ArrowLeftRight, Play, Pause, Square, Activity } from 'lucide-react';
 import ControlSection from './ControlSection';
 import ControlItem from './ControlItem';
 import { PRESETS } from '../engine';
 import { cn } from '../utils';
 
 const Sidebar = ({ state, setState, updateState, energy, handleEnergyChange, physics, snapToPivot }) => {
+  const [motionTimeLocal, setMotionTimeLocal] = React.useState((state.scanMotionTime ?? 500).toString());
+  const [dwellTimeLocal, setDwellTimeLocal] = React.useState((state.scanDwellTime ?? 300).toString());
+
+  React.useEffect(() => {
+    setMotionTimeLocal((state.scanMotionTime ?? 500).toString());
+  }, [state.scanMotionTime]);
+
+  React.useEffect(() => {
+    setDwellTimeLocal((state.scanDwellTime ?? 300).toString());
+  }, [state.scanDwellTime]);
+
   return (
     <div className={cn(
       "border-r flex flex-col shadow-2xl z-10 shrink-0 transition-all duration-300 ease-in-out h-full",
@@ -629,6 +640,366 @@ const Sidebar = ({ state, setState, updateState, energy, handleEnergyChange, phy
             valueClassName="text-purple-600"
             isLightMode={state.isLightMode}
           />
+        </ControlSection>
+
+        {/* Flat Mirror / Auto-Collimator */}
+        <ControlSection
+          title="Flat Mirror (Auto-Collimator)"
+          icon={ArrowLeftRight}
+          isLightMode={state.isLightMode}
+          className={cn(
+            "border-orange-500/30",
+            state.isLightMode ? "bg-orange-50/50" : "bg-orange-900/10"
+          )}
+          titleColor="text-orange-500"
+          iconColor="text-orange-500"
+        >
+          <div className="flex justify-between items-center">
+            <label className={cn("text-xs", state.isLightMode ? "text-orange-600" : "text-orange-300")}>
+              Return-path mirror for double-pass alignment
+            </label>
+            <button
+              onClick={() => updateState('mirrorEnabled', !state.mirrorEnabled)}
+              className={cn(
+                "px-4 py-1.5 rounded text-xs font-bold transition-all border shrink-0 ml-2",
+                state.mirrorEnabled
+                  ? "bg-orange-600 border-orange-400 text-white shadow-md"
+                  : (state.isLightMode
+                      ? "border-gray-300 bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      : "border-gray-600 bg-gray-800 text-gray-400 hover:text-white")
+              )}
+            >
+              {state.mirrorEnabled ? "● ON" : "○ OFF"}
+            </button>
+          </div>
+
+          {state.mirrorEnabled && (
+            <div className="space-y-3 pt-2">
+              <ControlItem
+                label="Mirror X"
+                unit="mm"
+                value={state.mirrorX}
+                min={100}
+                max={5000}
+                step={10}
+                onChange={(v) => updateState('mirrorX', v)}
+                valueClassName="text-orange-500"
+                isLightMode={state.isLightMode}
+              />
+              <ControlItem
+                label="Tilt"
+                unit="mrad"
+                value={state.mirrorAngle}
+                min={-100}
+                max={100}
+                step={0.1}
+                onChange={(v) => updateState('mirrorAngle', v)}
+                valueClassName="text-orange-500"
+                isLightMode={state.isLightMode}
+              />
+              <ControlItem
+                label="Length"
+                unit="mm"
+                value={state.mirrorLen}
+                min={10}
+                max={500}
+                step={10}
+                onChange={(v) => updateState('mirrorLen', v)}
+                valueClassName="text-orange-500"
+                isLightMode={state.isLightMode}
+              />
+            </div>
+          )}
+        </ControlSection>
+
+        {/* Parameter Scan */}
+        <ControlSection
+          title="Parameter Scan"
+          icon={Activity}
+          isLightMode={state.isLightMode}
+          className={cn(
+            "border-emerald-500/30",
+            state.isLightMode ? "bg-emerald-50/50" : "bg-emerald-900/10"
+          )}
+          titleColor="text-emerald-500"
+          iconColor="text-emerald-500"
+        >
+          {/* Scan Type Toggle */}
+          <div className="space-y-1">
+            <label className={cn("text-[10px] uppercase font-bold", state.isLightMode ? "text-gray-500" : "text-gray-400")}>
+              Scan Dimension
+            </label>
+            <div className={cn(
+              "grid grid-cols-2 gap-1 p-1 rounded-md border",
+              state.isLightMode ? "bg-white border-gray-200" : "bg-gray-950 border-gray-800"
+            )}>
+              <button
+                onClick={() => updateState({ scanType: 'theta', scanStart: 5.0, scanStop: 15.0, scanCurrentStep: 0 })}
+                disabled={state.scanActive}
+                className={cn(
+                  "py-1 text-xs rounded transition-all font-semibold",
+                  state.scanType === 'theta'
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : (state.isLightMode ? "text-gray-600 hover:bg-gray-100" : "text-gray-400 hover:text-white")
+                )}
+              >
+                Theta (Deg)
+              </button>
+              <button
+                onClick={() => updateState({ scanType: 'energy', scanStart: 12.0, scanStop: 20.0, scanCurrentStep: 0 })}
+                disabled={state.scanActive}
+                className={cn(
+                  "py-1 text-xs rounded transition-all font-semibold",
+                  state.scanType === 'energy'
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : (state.isLightMode ? "text-gray-600 hover:bg-gray-100" : "text-gray-400 hover:text-white")
+                )}
+              >
+                Energy (keV)
+              </button>
+            </div>
+          </div>
+
+          {/* Limits */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className={cn("text-[10px] uppercase font-bold", state.isLightMode ? "text-gray-500" : "text-gray-400")}>
+                Start
+              </label>
+              <input
+                type="number"
+                disabled={state.scanActive}
+                className={cn(
+                  "w-full border rounded px-2 py-1 text-xs font-mono outline-none focus:border-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-auto [&::-webkit-inner-spin-button]:appearance-auto",
+                  state.isLightMode ? "bg-white border-gray-200" : "bg-gray-950 border-gray-800"
+                )}
+                value={state.scanStart}
+                onChange={(e) => updateState('scanStart', parseFloat(e.target.value) || 0)}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className={cn("text-[10px] uppercase font-bold", state.isLightMode ? "text-gray-500" : "text-gray-400")}>
+                Stop
+              </label>
+              <input
+                type="number"
+                disabled={state.scanActive}
+                className={cn(
+                  "w-full border rounded px-2 py-1 text-xs font-mono outline-none focus:border-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-auto [&::-webkit-inner-spin-button]:appearance-auto",
+                  state.isLightMode ? "bg-white border-gray-200" : "bg-gray-950 border-gray-800"
+                )}
+                value={state.scanStop}
+                onChange={(e) => updateState('scanStop', parseFloat(e.target.value) || 0)}
+              />
+            </div>
+          </div>
+
+          {/* Jump to Start / Stop buttons */}
+          <div className="grid grid-cols-2 gap-2 mt-1">
+            <button
+              onClick={() => {
+                if (state.scanType === 'theta') {
+                  updateState('rectRotation', state.scanStart);
+                } else {
+                  handleEnergyChange(state.scanStart);
+                }
+              }}
+              className={cn(
+                "py-1 px-2 rounded border text-[10px] font-bold cursor-pointer transition-all text-center",
+                state.isLightMode
+                  ? "bg-gray-100 hover:bg-gray-250 border-gray-300 text-gray-700"
+                  : "bg-gray-800 hover:bg-gray-700 border-gray-700 text-gray-300"
+              )}
+            >
+              Jump to Start
+            </button>
+            <button
+              onClick={() => {
+                if (state.scanType === 'theta') {
+                  updateState('rectRotation', state.scanStop);
+                } else {
+                  handleEnergyChange(state.scanStop);
+                }
+              }}
+              className={cn(
+                "py-1 px-2 rounded border text-[10px] font-bold cursor-pointer transition-all text-center",
+                state.isLightMode
+                  ? "bg-gray-100 hover:bg-gray-250 border-gray-300 text-gray-700"
+                  : "bg-gray-800 hover:bg-gray-700 border-gray-700 text-gray-300"
+              )}
+            >
+              Jump to Stop
+            </button>
+          </div>
+
+          {/* Configuration */}
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className={cn("text-[10px] uppercase font-bold", state.isLightMode ? "text-gray-500" : "text-gray-400")}>
+                  Steps
+                </label>
+                <input
+                  type="number"
+                  disabled={state.scanActive}
+                  className={cn(
+                    "w-full border rounded px-2 py-1 text-xs font-mono outline-none focus:border-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-auto [&::-webkit-inner-spin-button]:appearance-auto",
+                    state.isLightMode ? "bg-white border-gray-200" : "bg-gray-950 border-gray-800"
+                  )}
+                  value={state.scanSteps}
+                  onChange={(e) => updateState('scanSteps', Math.max(1, parseInt(e.target.value) || 1))}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className={cn("text-[10px] uppercase font-bold", state.isLightMode ? "text-gray-500" : "text-gray-400")}>
+                  Motion Time (ms)
+                </label>
+                <input
+                  type="number"
+                  disabled={state.scanActive}
+                  className={cn(
+                    "w-full border rounded px-2 py-1 text-xs font-mono outline-none focus:border-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-auto [&::-webkit-inner-spin-button]:appearance-auto",
+                    state.isLightMode ? "bg-white border-gray-200" : "bg-gray-950 border-gray-800"
+                  )}
+                  value={motionTimeLocal}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setMotionTimeLocal(val);
+                    const parsed = parseInt(val, 10);
+                    if (!isNaN(parsed)) {
+                      updateState('scanMotionTime', Math.max(10, parsed));
+                    }
+                  }}
+                  onBlur={() => {
+                    setMotionTimeLocal(state.scanMotionTime.toString());
+                  }}
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-1">
+              <label className={cn("text-[10px] uppercase font-bold", state.isLightMode ? "text-gray-500" : "text-gray-400")}>
+                Dwell Time / Data Acquire (ms)
+              </label>
+              <input
+                type="number"
+                disabled={state.scanActive}
+                className={cn(
+                  "w-full border rounded px-2 py-1 text-xs font-mono outline-none focus:border-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-auto [&::-webkit-inner-spin-button]:appearance-auto",
+                  state.isLightMode ? "bg-white border-gray-200" : "bg-gray-950 border-gray-800"
+                )}
+                value={dwellTimeLocal}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDwellTimeLocal(val);
+                  const parsed = parseInt(val, 10);
+                  if (!isNaN(parsed)) {
+                    updateState('scanDwellTime', Math.max(0, parsed));
+                  }
+                }}
+                onBlur={() => {
+                  setDwellTimeLocal(state.scanDwellTime.toString());
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Execution Controls */}
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={() => updateState('scanActive', !state.scanActive)}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded text-xs font-bold transition-all border cursor-pointer",
+                state.scanActive
+                  ? "bg-amber-600 border-amber-400 text-white hover:bg-amber-500 shadow-md"
+                  : "bg-emerald-600 border-emerald-400 text-white hover:bg-emerald-500 shadow-md"
+              )}
+            >
+              {state.scanActive ? (
+                <>
+                  <Pause className="w-3.5 h-3.5" /> Pause
+                </>
+              ) : (
+                <>
+                  <Play className="w-3.5 h-3.5" /> Start Scan
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={() => updateState({ scanActive: false, scanCurrentStep: 0, scanLiveProgress: 0.0, scanPhase: 'idle' })}
+              className={cn(
+                "px-3 py-2 rounded border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                state.isLightMode
+                  ? "border-gray-300 bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  : "border-gray-600 bg-gray-800 text-gray-300 hover:text-white"
+              )}
+            >
+              <Square className="w-3.5 h-3.5" /> Reset
+            </button>
+          </div>
+
+          {/* Realistic Phase Status Badge */}
+          {state.scanLiveProgress > 0 && (
+            <div className={cn(
+              "h-8.5 px-2.5 border flex items-center justify-between text-xs font-semibold rounded-lg whitespace-nowrap overflow-hidden shrink-0",
+              state.scanPhase === 'moving'
+                ? (state.isLightMode ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-amber-950/20 border-amber-900/30 text-amber-400")
+                : state.scanPhase === 'dwelling'
+                  ? (state.isLightMode ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-emerald-950/20 border-emerald-900/30 text-emerald-400")
+                  : (state.isLightMode ? "bg-gray-100 border-gray-200 text-gray-700" : "bg-zinc-800 border-zinc-700 text-zinc-300")
+            )}>
+              <span className="text-[9.5px] uppercase text-gray-500">Scan Status</span>
+              <span className="flex items-center gap-1.5 text-[10.5px]">
+                {state.scanPhase === 'moving' ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                    <span>Moving to Step {state.scanCurrentStep + 1}</span>
+                  </>
+                ) : state.scanPhase === 'dwelling' ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                    <span>Dwelling / Acquiring</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-gray-500" />
+                    <span>Scan Completed</span>
+                  </>
+                )}
+              </span>
+            </div>
+          )}
+
+          {/* Progress Bar / Readout */}
+          <div className="space-y-1.5 pt-1">
+            <div className="flex justify-between text-[10px] font-semibold text-gray-500">
+              <span>Progress</span>
+              <span>{state.scanCurrentStep} / {state.scanSteps} steps</span>
+            </div>
+            <div className={cn(
+              "w-full h-2 rounded overflow-hidden relative",
+              state.isLightMode ? "bg-gray-200" : "bg-gray-800"
+            )}>
+              <div
+                className="h-full bg-emerald-500 transition-all duration-75"
+                style={{ width: `${(state.scanLiveProgress / state.scanSteps) * 100}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Trajectory plot view button */}
+          <button
+            onClick={() => updateState({ showTrajectoryPanel: true, trajectoryPanelHeight: Math.round(window.innerHeight / 3) })}
+            className={cn(
+              "w-full py-1.5 rounded border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-3",
+              state.isLightMode
+                ? "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                : "border-emerald-750/50 bg-emerald-950/20 text-emerald-400 hover:bg-emerald-900/25"
+            )}
+          >
+            <Activity className="w-3.5 h-3.5 animate-pulse" /> View Trajectory Plots
+          </button>
         </ControlSection>
 
         <section className={cn("space-y-4 pt-4 border-t", state.isLightMode ? "border-gray-200" : "border-gray-800")}>

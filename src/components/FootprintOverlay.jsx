@@ -186,12 +186,11 @@ const FootprintOverlay = ({ state, updateState, readout }) => {
   const [isMinimized, setIsMinimized] = useState(false);
   const [panelWidth, setPanelWidth] = useState(320);
 
-  // If UI is hidden, don't show the footprint overlay either
-  if (!state.uiVisible) return null;
+
 
   const footprintData = useMemo(() => {
     const { centralRay } = readout;
-    if (!centralRay || centralRay.path.length < 2) return null;
+    if (!centralRay || !centralRay.path || centralRay.path.length < 2) return null;
 
     // Global rotation angles
     const globalPitchDeg = (state.globalPitch / 1000) * (180 / Math.PI);
@@ -242,6 +241,29 @@ const FootprintOverlay = ({ state, updateState, readout }) => {
     };
   }, [state.globalPitch, state.rectRotation, state.c2Pitch, state.globalX, state.globalY, state.c1Y, state.c2X, state.c2Y, state.rayAngle, readout]);
 
+  // Safety guard (placed after all hooks)
+  if (!readout || !state.uiVisible) return null;
+
+  const handleResizeMouseDown = (mouseDownEvent) => {
+    mouseDownEvent.preventDefault();
+    const startWidth = panelWidth;
+    const startX = mouseDownEvent.clientX;
+
+    const onMouseMove = (moveEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const newWidth = Math.max(265, Math.min(650, startWidth - deltaX));
+      setPanelWidth(newWidth);
+    };
+
+    const onMouseUp = () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
+
   const handleHeaderMouseDown = (e) => {
     if (e.button !== 0) return;
     if (e.target.closest('button') || e.target.closest('input')) return;
@@ -286,6 +308,15 @@ const FootprintOverlay = ({ state, updateState, readout }) => {
         transform: `translate(${position.x}px, ${position.y}px)`
       }}
     >
+      {/* Draggable Resize Border Strip */}
+      {!isMinimized && (
+        <div
+          onMouseDown={handleResizeMouseDown}
+          className="absolute top-0 left-0 w-1.5 h-full cursor-ew-resize hover:bg-violet-500/35 bg-transparent transition-colors z-20 rounded-l-lg"
+          title="Drag left/right to resize box width"
+        />
+      )}
+
       {/* Draggable Header */}
       <div 
         onMouseDown={handleHeaderMouseDown}
@@ -301,30 +332,10 @@ const FootprintOverlay = ({ state, updateState, readout }) => {
         </div>
         
         <div className="flex items-center gap-2">
-          {/* Zoom controls (hidden when minimized) */}
-          {!isMinimized && (
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setPanelWidth(prev => Math.max(280, prev - 40))}
-                className="hover:bg-gray-700/30 p-1 rounded transition text-violet-400 hover:text-violet-500"
-                title="Scale Down"
-              >
-                <ZoomOut size={12} />
-              </button>
-              <button
-                onClick={() => setPanelWidth(prev => Math.min(600, prev + 40))}
-                className="hover:bg-gray-700/30 p-1 rounded transition text-violet-400 hover:text-violet-500"
-                title="Scale Up"
-              >
-                <ZoomIn size={12} />
-              </button>
-            </div>
-          )}
-
           {/* Minimize / Maximize toggle */}
           <button
             onClick={() => setIsMinimized(!isMinimized)}
-            className="hover:bg-gray-700/30 p-1 rounded transition text-violet-400 hover:text-violet-500"
+            className="hover:bg-gray-700/30 p-1 rounded transition text-violet-400 hover:text-violet-500 cursor-pointer"
             title={isMinimized ? "Expand Panel" : "Minimize Panel"}
           >
             {isMinimized ? <Maximize2 size={12} /> : <Minimize2 size={12} />}

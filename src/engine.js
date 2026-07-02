@@ -73,6 +73,9 @@ export class Ray {
         this.dir = norm([Math.cos(this.angle), Math.sin(this.angle)]);
         this.color = color;
         this.path = [this.start.slice()];
+        // Tracks which RectangleItem was struck to reach path[i].
+        // hitObjects[0] = null (starting point). hitObjects[i] = rect | null.
+        this.hitObjects = [null];
     }
 
     cast(rectangles, max_bounces = 20) {
@@ -83,9 +86,11 @@ export class Ray {
             const hit = this.findFirstHit(currentPoint, direction, rectangles);
             if (!hit.found) {
                 this.path.push(add(currentPoint, mult(direction, 5000))); // far exit
+                this.hitObjects.push(null); // free propagation, no rect
                 break;
             }
             this.path.push(hit.point);
+            this.hitObjects.push(hit.rect); // record which rect was struck
             direction = reflect(direction, hit.normal);
             currentPoint = hit.point;
         }
@@ -95,6 +100,7 @@ export class Ray {
         let closest = null;
         let minDist = Infinity;
         let closestNormal = null;
+        let closestRect = null;
 
         for (const rect of rectangles) {
             for (const [p1, p2] of rect.getEdges()) {
@@ -108,10 +114,13 @@ export class Ray {
                     
                     if (dot(normal, direction) > 0) normal = mult(normal, -1);
                     closestNormal = normal;
+                    closestRect = rect; // track which rect
                 }
             }
         }
-        return closest ? { found: true, normal: closestNormal, point: closest } : { found: false };
+        return closest
+            ? { found: true, normal: closestNormal, point: closest, rect: closestRect }
+            : { found: false };
     }
 
     segmentIntersection(origin, dir, p1, p2) {
@@ -131,6 +140,7 @@ export class Ray {
         return null;
     }
 
+    // Returns the y-coordinate of the FIRST crossing of the ray path at xTarget.
     detectAtX(xTarget) {
         for (let i = 1; i < this.path.length; i++) {
             const [x1, y1] = this.path[i - 1];
@@ -142,5 +152,19 @@ export class Ray {
             }
         }
         return null;
+    }
+
+    // Returns ALL y-crossings at xTarget (for multi-pass / return beam detection).
+    detectAllAtX(xTarget) {
+        const results = [];
+        for (let i = 1; i < this.path.length; i++) {
+            const [x1, y1] = this.path[i - 1];
+            const [x2, y2] = this.path[i];
+            if ((x1 - xTarget) * (x2 - xTarget) <= 0 && x1 !== x2) {
+                const t = (xTarget - x1) / (x2 - x1);
+                results.push(y1 + t * (y2 - y1));
+            }
+        }
+        return results;
     }
 }
